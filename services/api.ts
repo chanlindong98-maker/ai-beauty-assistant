@@ -4,7 +4,8 @@
  * 封装所有与后端的 HTTP 通信
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// 在 Vercel 部署时使用相对路径，本地开发时可指定后端地址
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 /**
  * 获取本地存储的访问令牌
