@@ -1,0 +1,7 @@
+{
+  "name": "AI 魅丽健康助手",
+  "description": "集成 AI 虚拟试穿、发型设计与中医智慧诊断（舌诊、面诊、面相），为您提供个性化的时尚建议与健康调理方案。",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

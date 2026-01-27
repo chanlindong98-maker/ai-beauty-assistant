@@ -1,0 +1,74 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>AI 魅丽健康助手 | Happy Beauty</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Quicksand', 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #fdfcfb 0%, #e2d1c3 100%);
+            background-attachment: fixed;
+            color: #4A4A4A;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .font-happy {
+            font-family: 'ZCOOL KuaiLe', cursive;
+        }
+        .bouncy {
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .bouncy:active {
+            transform: scale(0.9);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffffff;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        }
+        .rainbow-shadow {
+            box-shadow: 0 10px 20px -5px rgba(165, 148, 249, 0.4);
+        }
+        .candy-button {
+            background: linear-gradient(45deg, #FF7E67, #FF9A8B);
+            color: white;
+            box-shadow: 0 6px 15px rgba(255, 126, 103, 0.3);
+            border-radius: 20px;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: #eee;
+            height: 8px;
+            border-radius: 10px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #A594F9;
+            border-radius: 50%;
+            border: 4px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="antialiased">
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
