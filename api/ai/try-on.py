@@ -111,29 +111,36 @@ class handler(BaseHTTPRequestHandler):
 
             # 提取图片
             result_image = None
+            debug_log = []
+            v_time = "20260130-0010" # 版本标识
+            
             try:
-                parts_str = []
-                for i, part in enumerate(response.parts):
-                    p_type = "unknown"
-                    if hasattr(part, "text"): p_type = "text"
-                    if hasattr(part, "inline_data"): p_type = "inline_data"
-                    parts_str.append(f"Part {i}: {p_type}")
-                    if hasattr(part, "inline_data") and part.inline_data:
-                        result_image = f"data:image/png;base64,{part.inline_data.data}"
-                        break
-                print(f"[Try-On] Response Parts: {', '.join(parts_str)}")
+                if hasattr(response, 'parts'):
+                    for i, part in enumerate(response.parts):
+                        ptype = "unknown"
+                        if hasattr(part, "text"): ptype = f"text({len(part.text)})"
+                        if hasattr(part, "inline_data"): 
+                            ptype = "image"
+                            result_image = f"data:image/png;base64,{part.inline_data.data}"
+                            break
+                        debug_log.append(f"P{i}:{ptype}")
+                
+                if not result_image:
+                    f_reason = "Unknown"
+                    try: f_reason = str(response.candidates[0].finish_reason)
+                    except: pass
+                    safety = "None"
+                    try: safety = str(response.prompt_feedback.block_reason)
+                    except: pass
+                    
+                    self._send_json({
+                        "success": False, 
+                        "message": f"[{v_time}] AI 未能生成图像 | 原因: {f_reason} | 安全: {safety}",
+                        "debug": " | ".join(debug_log)
+                    }, 500)
+                    return
             except Exception as pe:
-                print(f"[Try-On] Part Access Error: {str(pe)}")
-
-            if not result_image:
-                finish_reason = "Unknown"
-                try: finish_reason = str(response.candidates[0].finish_reason)
-                except: pass
-                self._send_json({
-                    "success": False, 
-                    "message": f"AI 未能生成图像 (原因: {finish_reason})",
-                    "debug_info": f"Parts: {len(response.parts) if hasattr(response, 'parts') else 0}"
-                }, 500)
+                self._send_json({"success": False, "message": f"[{v_time}] 结果解析异常: {str(pe)}"}, 500)
                 return
 
             self._send_json({
