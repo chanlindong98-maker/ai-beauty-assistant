@@ -108,6 +108,8 @@ class handler(BaseHTTPRequestHandler):
                 {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
             ]
+            face_part = {"inline_data": {"mime_type": "image/jpeg", "data": face_data}}
+            item_part = {"inline_data": {"mime_type": "image/jpeg", "data": item_data}}
             
             response = model.generate_content(
                 contents=[face_part, item_part, prompt],
