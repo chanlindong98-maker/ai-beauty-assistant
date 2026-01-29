@@ -106,9 +106,9 @@ class handler(BaseHTTPRequestHandler):
                 耳饰的细节（材质、反光、吊坠）应清晰可见。保持五官特征和肤色真实。
                 输出必须是戴上耳饰后的效果图。"""
 
-            # 调用 Gemini (切换为更稳健的 2.0-flash 通用模型)
-            model = genai.GenerativeModel("gemini-2.0-flash")
-            print(f"[Try-On] Model: gemini-2.0-flash")
+            # 调用 Gemini (使用支持图像生成的实验性模型)
+            model = genai.GenerativeModel("gemini-2.0-flash-exp")
+            print(f"[Try-On] Model: gemini-2.0-flash-exp")
             
             # 极致放宽安全限制，防止误拦截
             safety_settings = [
