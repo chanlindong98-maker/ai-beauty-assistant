@@ -4,19 +4,7 @@ import json
 from datetime import date
 from http.server import BaseHTTPRequestHandler
 
-def get_supabase():
-    """安全获取 Supabase 客户端"""
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-    
-    if not url or not key:
-        raise ValueError("缺少 Supabase 环境变量 (SUPABASE_URL 或 SUPABASE_SERVICE_ROLE_KEY)")
-        
-    try:
-        from supabase import create_client
-        return create_client(url, key)
-    except ImportError:
-        raise ImportError("无法在环境中找到 'supabase' 库，请确保 api/requirements.txt 已正确安装")
+from api._utils import get_supabase_client, json_response, cors_headers
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -41,7 +29,7 @@ class handler(BaseHTTPRequestHandler):
                 self._send_json({"success": False, "message": "注册信息不完整哦 🍭"}, 400)
                 return
 
-            supabase = get_supabase()
+            supabase = get_supabase_client()
             email = f"{username}@happy-beauty.local"
 
             # 创建用户

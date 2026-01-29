@@ -10,6 +10,13 @@ def get_supabase_client():
     """获取 Supabase 客户端"""
     url = os.environ.get("SUPABASE_URL", "")
     key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    
+    if not url or not key:
+        raise ValueError("缺少 Supabase 环境变量 (SUPABASE_URL 或 SUPABASE_SERVICE_ROLE_KEY)")
+        
+    if not key.startswith("eyJ"):
+        raise ValueError("SUPABASE_SERVICE_ROLE_KEY 格式似乎不正确。请确保使用的是 Service Role (Secret) Key，它应该以 'eyJ' 开头。当前值以 " + (key[:4] if key else "空") + " 开头。")
+        
     return create_client(url, key)
 
 
