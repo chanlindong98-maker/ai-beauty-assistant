@@ -330,14 +330,14 @@ export interface SystemConfigItem {
  * 获取仪表盘统计
  */
 export async function getAdminStats(): Promise<DashboardStats> {
-    return request<DashboardStats>('/api/admin/dashboard/stats');
+    return request<DashboardStats>('/api/admin_stats');
 }
 
 /**
  * 获取会员列表
  */
 export async function getAdminUsers(query?: string): Promise<AdminUserDetail[]> {
-    const url = query ? `/api/admin/users?query=${encodeURIComponent(query)}` : '/api/admin/users';
+    const url = query ? `/api/admin_users?query=${encodeURIComponent(query)}` : '/api/admin_users';
     return request<AdminUserDetail[]>(url);
 }
 
@@ -345,7 +345,7 @@ export async function getAdminUsers(query?: string): Promise<AdminUserDetail[]> 
  * 修改用户魔法值
  */
 export async function updateAdminUserCredits(userId: string, credits: number, mode: 'set' | 'add'): Promise<any> {
-    return request('/api/admin/users/credits', {
+    return request('/api/admin_credits', {
         method: 'POST',
         body: JSON.stringify({ user_id: userId, credits, mode }),
     });
@@ -355,14 +355,14 @@ export async function updateAdminUserCredits(userId: string, credits: number, mo
  * 获取系统配置
  */
 export async function getAdminConfig(): Promise<SystemConfigItem[]> {
-    return request<SystemConfigItem[]>('/api/admin/config');
+    return request<SystemConfigItem[]>('/api/admin_config');
 }
 
 /**
  * 更新系统配置
  */
 export async function updateAdminConfig(items: SystemConfigItem[]): Promise<any> {
-    return request('/api/admin/config/update', {
+    return request('/api/admin_config', {
         method: 'POST',
         body: JSON.stringify(items),
     });
@@ -372,7 +372,7 @@ export async function updateAdminConfig(items: SystemConfigItem[]): Promise<any>
  * 修改管理员密码
  */
 export async function resetAdminPassword(newPassword: string): Promise<any> {
-    return request('/api/admin/reset-password', {
+    return request('/api/admin_reset_password', {
         method: 'POST',
         body: JSON.stringify({ new_password: newPassword }),
     });
