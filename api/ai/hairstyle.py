@@ -108,9 +108,8 @@ class handler(BaseHTTPRequestHandler):
             analysis_response = text_model.generate_content(contents=[image_part, analysis_prompt])
             analysis_text = analysis_response.text or "未能生成分析"
 
-            # 生成推荐发型图片
-            # 生成推荐发型图片
-            image_model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")
+            # 生成推荐发型图片 (切换为稳健的 2.0-flash 模型)
+            image_model = genai.GenerativeModel("gemini-2.0-flash")
             
             rec_prompt = f"""生成一张高度写实的正面照片。
             必须使用原图中的人物面部，为这位{age}岁的人物换上一款完美的{gender_term}发型。
@@ -142,7 +141,7 @@ class handler(BaseHTTPRequestHandler):
             
             cat_image = extract_image(cat_response)
 
-            v_tag = "[20260130-V2]" # 诊断版本
+            v_tag = "[20260130-V3]" # 2.0-flash 稳定版
             if not rec_image or not cat_image:
                 f_reason = "Unknown"
                 try: f_reason = str(rec_response.candidates[0].finish_reason)
