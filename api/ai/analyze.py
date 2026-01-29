@@ -5,9 +5,9 @@ POST /api/ai/analyze
 import os
 import json
 import sys
+import base64
 from http.server import BaseHTTPRequestHandler
 from supabase import create_client
-import google.generativeai as genai
 
 # 导入共享工具模块
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -77,12 +77,16 @@ class handler(BaseHTTPRequestHandler):
 
             image_data = image.split(",")[1] if "," in image else image
 
-            # 配置 Gemini (优先从数据库读取 API 密钥)
+            # 配置 Gemini (优先从数据库读取 API 密钥) - 使用新版 google-genai SDK
             api_key = get_config("gemini_api_key")
             if not api_key:
                 self._send_json({"success": False, "message": "未配置 Gemini API 密钥，请在管理后台设置"}, 500)
                 return
-            genai.configure(api_key=api_key, transport='rest')
+            
+            from google import genai
+            from google.genai import types
+            
+            client = genai.Client(api_key=api_key)
             
             # 构建提示词
             system_instruction = "你是一位拥有深厚底蕴的中医及传统文化学者。"
@@ -112,19 +116,27 @@ class handler(BaseHTTPRequestHandler):
                 4. 命运总括：给出富有智慧的总结和建议。
                 请用中文分段回复，需说明仅供参考。"""
 
-            model = genai.GenerativeModel(
-                "gemini-2.0-flash",
-                system_instruction=system_instruction
-            )
+            image_bytes = base64.b64decode(image_data)
+            image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
             
-            image_part = {"inline_data": {"mime_type": "image/jpeg", "data": image_data}}
+            # 构建完整提示词
+            full_prompt = f"{system_instruction}\n\n{prompt}"
             
-            response = model.generate_content(
-                contents=[image_part, prompt],
-                generation_config={"temperature": 0.7}
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=[image_part, full_prompt],
+                config=types.GenerateContentConfig(
+                    temperature=0.7
+                )
             )
 
-            result_text = response.text or "AI 暂时无法给出分析结果"
+            result_text = ""
+            if response.candidates and response.candidates[0].content:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, "text") and part.text:
+                        result_text = part.text
+                        break
+            result_text = result_text or "AI 暂时无法给出分析结果"
 
             self._send_json({
                 "success": True,

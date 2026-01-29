@@ -2,7 +2,6 @@ import os
 import json
 import sys
 from http.server import BaseHTTPRequestHandler
-import google.generativeai as genai
 
 # 导入共享工具模块
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -17,16 +16,16 @@ class handler(BaseHTTPRequestHandler):
                 self._send_json({"success": False, "message": "未配置 Gemini API 密钥，请在管理后台设置"}, 500)
                 return
 
-            genai.configure(api_key=api_key, transport='rest')
+            from google import genai
+            
+            client = genai.Client(api_key=api_key)
             
             models = []
-            for m in genai.list_models():
+            for m in client.models.list():
                 models.append({
                     "name": m.name,
-                    "version": m.version,
-                    "display_name": m.display_name,
-                    "description": m.description,
-                    "supported_generation_methods": m.supported_generation_methods
+                    "display_name": getattr(m, "display_name", m.name),
+                    "description": getattr(m, "description", ""),
                 })
 
             self._send_json({

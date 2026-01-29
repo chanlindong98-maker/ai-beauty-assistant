@@ -5,9 +5,9 @@ POST /api/ai/try-on
 import os
 import json
 import sys
+import base64
 from http.server import BaseHTTPRequestHandler
 from supabase import create_client
-import google.generativeai as genai
 
 # 导入共享工具模块
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -85,12 +85,16 @@ class handler(BaseHTTPRequestHandler):
             face_data = face_image.split(",")[1] if "," in face_image else face_image
             item_data = item_image.split(",")[1] if "," in item_image else item_image
 
-            # 配置 Gemini (优先从数据库读取 API 密钥)
+            # 配置 Gemini (优先从数据库读取 API 密钥) - 使用新版 google-genai SDK
             api_key = get_config("gemini_api_key")
             if not api_key:
                 self._send_json({"success": False, "message": "未配置 Gemini API 密钥，请在管理后台设置"}, 500)
                 return
-            genai.configure(api_key=api_key, transport='rest')
+            
+            from google import genai
+            from google.genai import types
+            
+            client = genai.Client(api_key=api_key)
             
             # 构建提示词
             if try_on_type == "clothing":
@@ -107,54 +111,50 @@ class handler(BaseHTTPRequestHandler):
                 输出必须是戴上耳饰后的效果图。"""
 
             # 调用 Gemini (使用支持图像生成的模型)
-            model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")
             print(f"[Try-On] Model: gemini-2.0-flash-exp-image-generation")
             
-            # 极致放宽安全限制，防止误拦截
-            safety_settings = [
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-            ]
-            face_part = {"inline_data": {"mime_type": "image/jpeg", "data": face_data}}
-            item_part = {"inline_data": {"mime_type": "image/jpeg", "data": item_data}}
+            # 构建图片内容
+            face_part = types.Part.from_bytes(
+                data=base64.b64decode(face_data),
+                mime_type="image/jpeg"
+            )
+            item_part = types.Part.from_bytes(
+                data=base64.b64decode(item_data),
+                mime_type="image/jpeg"
+            )
             
             # 关键配置：必须指定 response_modalities 包含 IMAGE 才能生成图像
-            generation_config = {
-                "response_modalities": ["TEXT", "IMAGE"]
-            }
-            
-            response = model.generate_content(
+            response = client.models.generate_content(
+                model="gemini-2.0-flash-exp-image-generation",
                 contents=[face_part, item_part, prompt],
-                safety_settings=safety_settings,
-                generation_config=generation_config
+                config=types.GenerateContentConfig(
+                    response_modalities=["TEXT", "IMAGE"]
+                )
             )
 
             # 提取图片
             result_image = None
             debug_log = []
-            v_time = "20260130-0035" # 数据解码修复版
+            v_time = "20260130-V4"  # 新版 SDK
             model_text = ""
             
             try:
-                # 检查 parts 是否存在
-                if not hasattr(response, 'parts') or not response.parts:
-                    debug_log.append("EmptyParts")
-                else:
-                    for i, part in enumerate(response.parts):
+                # 新版 SDK 响应格式：response.candidates[0].content.parts
+                if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                    for i, part in enumerate(response.candidates[0].content.parts):
                         if hasattr(part, "text") and part.text:
                             model_text = part.text
                             debug_log.append(f"T{i}")
                         if hasattr(part, "inline_data") and part.inline_data:
-                            # 关键修复：处理 bytes 和 string 两种情况
+                            # 处理图片数据
                             img_data = part.inline_data.data
                             if isinstance(img_data, bytes):
-                                import base64
                                 img_data = base64.b64encode(img_data).decode('utf-8')
                             result_image = f"data:image/jpeg;base64,{img_data}"
                             debug_log.append(f"I{i}")
                             break
+                else:
+                    debug_log.append("EmptyParts")
                 
                 if not result_image:
                     f_reason = "Unknown"
