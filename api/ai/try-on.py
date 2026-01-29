@@ -98,7 +98,8 @@ class handler(BaseHTTPRequestHandler):
                 输出必须是戴上耳饰后的效果图。"""
 
             # 调用 Gemini
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            # 调用 Gemini
+            model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")
             print(f"[Try-On] Prompt: {prompt[:50]}...")
             
             face_part = {"inline_data": {"mime_type": "image/jpeg", "data": face_data}}
