@@ -71,21 +71,39 @@ def get_user_from_token(token: str) -> dict | None:
     return None
 
 
-def parse_body(request) -> dict:
+def get_admin_user(token: str) -> dict | None:
+    """获取并验证管理员用户"""
+    user = get_user_from_token(token)
+    if user and user.get("is_admin"):
+        return user
+    return None
+
+
+def parse_body(handler) -> dict:
     """解析请求体"""
     try:
-        body = request.get("body", "{}")
-        if isinstance(body, bytes):
-            body = body.decode("utf-8")
+        content_length = int(handler.headers.get("Content-Length", 0))
+        if content_length == 0:
+            return {}
+        body = handler.rfile.read(content_length).decode("utf-8")
         return json.loads(body) if body else {}
     except Exception:
         return {}
 
 
-def get_auth_token(request) -> str | None:
-    """从请求头获取认证令牌"""
-    headers = request.get("headers", {})
-    auth = headers.get("authorization", headers.get("Authorization", ""))
+def get_auth_token(handler) -> str | None:
+    """从处理类中获取认证令牌"""
+    auth = handler.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         return auth[7:]
     return None
+
+
+def send_json(handler, data: dict, status: int = 200):
+    """发送 JSON 响应"""
+    handler.send_response(status)
+    for key, value in cors_headers().items():
+        handler.send_header(key, value)
+    handler.send_header("Content-Type", "application/json")
+    handler.end_headers()
+    handler.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
