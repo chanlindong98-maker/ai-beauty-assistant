@@ -98,7 +98,6 @@ class handler(BaseHTTPRequestHandler):
                 输出必须是戴上耳饰后的效果图。"""
 
             # 调用 Gemini
-            # 调用 Gemini
             model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")
             
             # 极致放宽安全限制，防止误拦截
@@ -119,7 +118,7 @@ class handler(BaseHTTPRequestHandler):
             # 提取图片
             result_image = None
             debug_log = []
-            v_time = "20260130-0015" # 最新诊断版本
+            v_time = "20260130-0020" # 强制部署版本
             
             try:
                 # 检查 parts 是否存在
