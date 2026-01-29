@@ -122,8 +122,8 @@ class handler(BaseHTTPRequestHandler):
             analysis_response = text_model.generate_content(contents=[image_part, analysis_prompt])
             analysis_text = analysis_response.text or "未能生成分析"
 
-            # 生成推荐发型图片 (使用支持图像生成的实验性模型)
-            image_model = genai.GenerativeModel("gemini-2.0-flash-exp")
+            # 生成推荐发型图片 (使用支持图像生成的模型)
+            image_model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")
             
             rec_prompt = f"""生成一张高度写实的正面照片。
             必须使用原图中的人物面部，为这位{age}岁的人物换上一款完美的{gender_term}发型。
