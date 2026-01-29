@@ -33,9 +33,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                 const c = await api.getAdminConfig();
                 setConfig(c);
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Admin Load Error:', err);
-            setError((err as Error).message || '数据加载失败，请检查数据库配置');
+            const msg = err.message || '未知错误';
+            setError(msg);
         } finally {
             setLoading(false);
         }
