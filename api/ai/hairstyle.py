@@ -135,18 +135,18 @@ class handler(BaseHTTPRequestHandler):
                         break
             analysis_text = analysis_text or "未能生成分析"
 
-            # 生成推荐发型图片 (使用支持图像生成的模型)
+            # 生成推荐发型图片 (使用官方推荐的图像生成模型)
             rec_prompt = f"""生成一张高度写实的正面照片。
             必须使用原图中的人物面部，为这位{age}岁的人物换上一款完美的{gender_term}发型。
             背景简洁专业。"""
             
-            # 关键配置：必须指定 response_modalities 包含 IMAGE 才能生成图像
+            # 关键配置：使用字典形式传递配置以提高兼容性
             rec_response = client.models.generate_content(
-                model="gemini-2.0-flash-exp-image-generation",
+                model="gemini-2.0-flash",
                 contents=[image_part, rec_prompt],
-                config=types.GenerateContentConfig(
-                    response_modalities=["TEXT", "IMAGE"]
-                )
+                config={
+                    "response_modalities": ["IMAGE"]
+                }
             )
             
             rec_image = extract_image(rec_response)
@@ -156,11 +156,11 @@ class handler(BaseHTTPRequestHandler):
             展示10种风格迥异的发型，整齐网格排版。"""
             
             cat_response = client.models.generate_content(
-                model="gemini-2.0-flash-exp-image-generation",
+                model="gemini-2.0-flash",
                 contents=[image_part, cat_prompt],
-                config=types.GenerateContentConfig(
-                    response_modalities=["TEXT", "IMAGE"]
-                )
+                config={
+                    "response_modalities": ["IMAGE"]
+                }
             )
             
             cat_image = extract_image(cat_response)

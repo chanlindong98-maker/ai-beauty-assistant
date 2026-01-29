@@ -110,8 +110,8 @@ class handler(BaseHTTPRequestHandler):
                 耳饰的细节（材质、反光、吊坠）应清晰可见。保持五官特征和肤色真实。
                 输出必须是戴上耳饰后的效果图。"""
 
-            # 调用 Gemini (使用支持图像生成的模型)
-            print(f"[Try-On] Model: gemini-2.0-flash-exp-image-generation")
+            # 调用 Gemini (使用官方推荐的图像生成模型)
+            print(f"[Try-On] Model: gemini-2.0-flash")
             
             # 构建图片内容
             face_part = types.Part.from_bytes(
@@ -123,13 +123,13 @@ class handler(BaseHTTPRequestHandler):
                 mime_type="image/jpeg"
             )
             
-            # 关键配置：必须指定 response_modalities 包含 IMAGE 才能生成图像
+            # 关键配置：使用字典形式传递配置以提高兼容性
             response = client.models.generate_content(
-                model="gemini-2.0-flash-exp-image-generation",
+                model="gemini-2.0-flash",
                 contents=[face_part, item_part, prompt],
-                config=types.GenerateContentConfig(
-                    response_modalities=["TEXT", "IMAGE"]
-                )
+                config={
+                    "response_modalities": ["IMAGE"]
+                }
             )
 
             # 提取图片
