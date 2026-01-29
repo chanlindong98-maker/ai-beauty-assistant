@@ -124,7 +124,34 @@ class handler(BaseHTTPRequestHandler):
             elif action == "config":
                 if method == "GET":
                     res = supabase.table("system_config").select("*").execute()
-                    safe_send_json(self, res.data or [])
+                    db_config = {item["key"]: item for item in (res.data or [])}
+                    
+                    essential_keys = [
+                        ("gemini_api_key", "Google Gemini API 密钥", os.environ.get("GEMINI_API_KEY", "")),
+                        ("alipay_app_id", "支付宝 AppID", os.environ.get("ALIPAY_APP_ID", "")),
+                        ("alipay_app_private_key", "支付宝应用私钥", os.environ.get("ALIPAY_APP_PRIVATE_KEY", "")),
+                        ("alipay_public_key", "支付宝公钥", os.environ.get("ALIPAY_PUBLIC_KEY", "")),
+                        ("alipay_notify_url", "支付宝异步回调地址", os.environ.get("ALIPAY_NOTIFY_URL", "")),
+                        ("alipay_return_url", "支付宝同步跳转地址", os.environ.get("ALIPAY_RETURN_URL", "")),
+                    ]
+                    
+                    result = []
+                    added = set()
+                    
+                    # 首先添加基础配置项
+                    for key, desc, env_val in essential_keys:
+                        if key in db_config:
+                            result.append(db_config[key])
+                        else:
+                            result.append({"key": key, "value": env_val or "", "description": desc})
+                        added.add(key)
+                    
+                    # 添加数据库中其他的配置
+                    for item in (res.data or []):
+                        if item["key"] not in added:
+                            result.append(item)
+                    
+                    safe_send_json(self, result)
                 elif method == "POST":
                     items = parse_body(self)
                     for it in items:
