@@ -71,7 +71,7 @@ async function request<T>(
         try {
             errorData = await response.json();
         } catch (e) {
-            errorData = { detail: '请求失败', status: response.status };
+            errorData = { detail: `请求失败 (HTTP ${response.status})`, status: response.status };
         }
 
         console.error(`API Error [${endpoint}]:`, {

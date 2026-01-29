@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import os
+import traceback
 from datetime import date, datetime
 from api._utils import get_auth_token, get_admin_user, send_json, get_supabase_client, parse_body
 from urllib.parse import urlparse, parse_qs
@@ -23,17 +24,26 @@ class handler(BaseHTTPRequestHandler):
             send_json(self, {"success": False, "message": "需要管理员权限"}, 403)
             return
 
-        # 2. 解析路由
+        # 2. 解析路由 (更加鲁棒的识别方式)
         parsed_url = urlparse(self.path)
-        path = parsed_url.path.strip("/")
-        # 处理可能的后缀，例如 /api/admin_stats -> admin_stats
-        action = path.split("/")[-1] 
-        
-        # 如果是通过 query 参数传递 action (作为备选)
+        full_path = parsed_url.path
         query_params = parse_qs(parsed_url.query)
-        action_param = query_params.get("action", [None])[0]
-        if action_param:
-            action = action_param
+        
+        # 自动识别操作类型
+        action = "unknown"
+        if "admin_stats" in full_path:
+            action = "stats"
+        elif "admin_users" in full_path:
+            action = "users"
+        elif "admin_credits" in full_path:
+            action = "credits"
+        elif "admin_config" in full_path:
+            action = "config"
+        elif "admin_reset_password" in full_path:
+            action = "password"
+        
+        # 打印调试信息 (Vercel Logs 中可见)
+        print(f"[Admin API] Method: {method}, Path: {full_path}, Detected Action: {action}")
 
         try:
             supabase = get_supabase_client()
@@ -41,18 +51,18 @@ class handler(BaseHTTPRequestHandler):
             # --- 分发路由 ---
             
             # [Stats] 营收统计
-            if "stats" in action and method == "GET":
+            if action == "stats" and method == "GET":
                 # 总用户
                 users_res = supabase.table("user_profiles").select("id", count="exact").execute()
                 total_users = users_res.count or 0
                 # 订单统计
                 orders_res = supabase.table("orders").select("amount").eq("status", "PAID").execute()
-                total_recharge_amount = sum(float(item["amount"]) for item in (orders_res.data or []))
+                total_recharge_amount = sum(float(item.get("amount", 0)) for item in (orders_res.data or []))
                 total_orders = len(orders_res.data or [])
                 # 今日统计
                 today = str(date.today())
                 today_res = supabase.table("orders").select("amount").eq("status", "PAID").gte("created_at", f"{today}T00:00:00").execute()
-                today_recharge_amount = sum(float(item["amount"]) for item in (today_res.data or []))
+                today_recharge_amount = sum(float(item.get("amount", 0)) for item in (today_res.data or []))
                 
                 send_json(self, {
                     "total_users": total_users,
@@ -63,25 +73,24 @@ class handler(BaseHTTPRequestHandler):
                 })
 
             # [Users] 会员列表
-            elif "users" in action and method == "GET":
-                query = query_params.get("query", [None])[0]
+            elif action == "users" and method == "GET":
+                query_str = query_params.get("query", [None])[0]
                 builder = supabase.table("user_profiles").select("*")
-                if query:
-                    builder = builder.ilike("nickname", f"%{query}%")
+                if query_str:
+                    builder = builder.ilike("nickname", f"%{query_str}%")
                 res = builder.order("id").limit(100).execute()
                 users = []
                 for item in (res.data or []):
                     users.append({
                         "id": item["id"],
                         "nickname": item["nickname"],
-                        "email": None,
                         "credits": item["credits"],
                         "is_admin": item.get("is_admin", False)
                     })
                 send_json(self, users)
 
             # [Credits] 修改魔法值
-            elif "credits" in action and method == "POST":
+            elif action == "credits" and method == "POST":
                 data = parse_body(self)
                 user_id = data.get("user_id")
                 credits = data.get("credits", 0)
@@ -92,16 +101,16 @@ class handler(BaseHTTPRequestHandler):
                 
                 if mode == "add":
                     curr = supabase.table("user_profiles").select("credits").eq("id", user_id).single().execute()
-                    new_credits = (curr.data["credits"] if curr.data else 0) + credits
+                    new_credits = (curr.data["credits"] if curr.data else 0) + int(credits)
                 else:
-                    new_credits = credits
+                    new_credits = int(credits)
                 
                 new_credits = max(0, new_credits)
                 supabase.table("user_profiles").update({"credits": new_credits}).eq("id", user_id).execute()
                 send_json(self, {"success": True, "message": f"成功更新为 {new_credits} 次", "new_credits": new_credits})
 
             # [Config] 系统设置
-            elif "config" in action:
+            elif action == "config":
                 if method == "GET":
                     res = supabase.table("system_config").select("*").execute()
                     db_config = {item["key"]: item for item in (res.data or [])}
@@ -140,17 +149,19 @@ class handler(BaseHTTPRequestHandler):
                     send_json(self, {"success": True, "message": "配置已更新"})
 
             # [Password] 重置密码
-            elif "password" in action and method == "POST":
+            elif action == "password" and method == "POST":
                 data = parse_body(self)
                 new_pwd = data.get("new_password")
                 if not new_pwd or len(new_pwd) < 6:
                     send_json(self, {"success": False, "message": "密码至少6位"}, 400)
                     return
+                # 注意：supabase-py 的 admin 接口需要 service_role key 才能工作
                 supabase.auth.admin.update_user_by_id(admin["id"], {"password": new_pwd})
                 send_json(self, {"success": True, "message": "修改成功"})
 
             else:
-                send_json(self, {"success": False, "message": f"未知的操作: {action}"}, 404)
+                send_json(self, {"success": False, "message": f"未知的操作或方法: {action} ({method}), Path: {full_path}"}, 404)
 
         except Exception as e:
-            send_json(self, {"success": False, "message": f"管理操作失败: {str(e)}"}, 500)
+            traceback.print_exc() # 在日志中打印详细错误
+            send_json(self, {"success": False, "message": f"管理操作失败: {str(e)}", "trace": traceback.format_exc()}, 500)
