@@ -40,14 +40,19 @@ def consume_credit(user_id: str, current_credits: int) -> bool:
 
 
 def extract_image(response) -> str:
+    """从 Gemini 响应中提取图像数据，兼容 bytes 和 string 格式"""
+    import base64
     try:
         for part in response.parts:
             if hasattr(part, "inline_data") and part.inline_data:
-                return part.inline_data.data
+                img_data = part.inline_data.data
+                # 关键修复：处理 bytes 和 string 两种情况
+                if isinstance(img_data, bytes):
+                    img_data = base64.b64encode(img_data).decode('utf-8')
+                return img_data
     except Exception as e:
         print(f"[AI] Extract Image Error: {str(e)}")
     return ""
-local_log = ""
 
 
 class handler(BaseHTTPRequestHandler):

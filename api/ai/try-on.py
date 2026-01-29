@@ -119,7 +119,7 @@ class handler(BaseHTTPRequestHandler):
             # 提取图片
             result_image = None
             debug_log = []
-            v_time = "20260130-0030" # 模型切换版
+            v_time = "20260130-0035" # 数据解码修复版
             model_text = ""
             
             try:
@@ -131,8 +131,13 @@ class handler(BaseHTTPRequestHandler):
                         if hasattr(part, "text") and part.text:
                             model_text = part.text
                             debug_log.append(f"T{i}")
-                        if hasattr(part, "inline_data") and part.inline_data: 
-                            result_image = f"data:image/jpeg;base64,{part.inline_data.data}"
+                        if hasattr(part, "inline_data") and part.inline_data:
+                            # 关键修复：处理 bytes 和 string 两种情况
+                            img_data = part.inline_data.data
+                            if isinstance(img_data, bytes):
+                                import base64
+                                img_data = base64.b64encode(img_data).decode('utf-8')
+                            result_image = f"data:image/jpeg;base64,{img_data}"
                             debug_log.append(f"I{i}")
                             break
                 
