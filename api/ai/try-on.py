@@ -120,9 +120,15 @@ class handler(BaseHTTPRequestHandler):
             face_part = {"inline_data": {"mime_type": "image/jpeg", "data": face_data}}
             item_part = {"inline_data": {"mime_type": "image/jpeg", "data": item_data}}
             
+            # 关键配置：必须指定 response_modalities 包含 IMAGE 才能生成图像
+            generation_config = {
+                "response_modalities": ["TEXT", "IMAGE"]
+            }
+            
             response = model.generate_content(
                 contents=[face_part, item_part, prompt],
-                safety_settings=safety_settings
+                safety_settings=safety_settings,
+                generation_config=generation_config
             )
 
             # 提取图片

@@ -136,10 +136,16 @@ class handler(BaseHTTPRequestHandler):
                 {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
             ]
+            
+            # 关键配置：必须指定 response_modalities 包含 IMAGE 才能生成图像
+            generation_config = {
+                "response_modalities": ["TEXT", "IMAGE"]
+            }
 
             rec_response = image_model.generate_content(
                 contents=[image_part, rec_prompt],
-                safety_settings=safety_settings
+                safety_settings=safety_settings,
+                generation_config=generation_config
             )
             
             rec_image = extract_image(rec_response)
@@ -150,7 +156,8 @@ class handler(BaseHTTPRequestHandler):
             
             cat_response = image_model.generate_content(
                 contents=[image_part, cat_prompt],
-                safety_settings=safety_settings
+                safety_settings=safety_settings,
+                generation_config=generation_config
             )
             
             cat_image = extract_image(cat_response)
