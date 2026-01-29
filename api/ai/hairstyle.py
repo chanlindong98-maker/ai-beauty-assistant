@@ -97,14 +97,14 @@ class handler(BaseHTTPRequestHandler):
             2. 10种推荐发型列表
             3. 最优发型推荐及理由"""
 
-            text_model = genai.GenerativeModel("gemini-2.0-flash")
+            text_model = genai.GenerativeModel("gemini-1.5-flash")
             image_part = {"inline_data": {"mime_type": "image/jpeg", "data": image_data}}
             
             analysis_response = text_model.generate_content(contents=[image_part, analysis_prompt])
             analysis_text = analysis_response.text or "未能生成分析"
 
             # 生成推荐发型图片
-            image_model = genai.GenerativeModel("gemini-2.0-flash-exp")
+            image_model = genai.GenerativeModel("gemini-1.5-flash")
             
             rec_prompt = f"""生成一张高度写实的正面照片。
             必须使用原图中的人物面部，为这位{age}岁的人物换上一款完美的{gender_term}发型。

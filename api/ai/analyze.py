@@ -104,7 +104,7 @@ class handler(BaseHTTPRequestHandler):
                 请用中文分段回复，需说明仅供参考。"""
 
             model = genai.GenerativeModel(
-                "gemini-2.0-flash",
+                "gemini-1.5-flash",
                 system_instruction=system_instruction
             )
             
