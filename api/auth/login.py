@@ -56,7 +56,9 @@ class handler(BaseHTTPRequestHandler):
                     "nickname": profile["nickname"],
                     "device_id": profile["device_id"],
                     "credits": profile["credits"],
-                    "isAdmin": profile.get("is_admin", False)
+                    "referrals_today": profile.get("referrals_today", 0),
+                    "last_referral_date": profile.get("last_referral_date", ""),
+                    "is_admin": profile.get("is_admin", False)
                 },
                 "access_token": auth_response.session.access_token if auth_response.session else None
             })

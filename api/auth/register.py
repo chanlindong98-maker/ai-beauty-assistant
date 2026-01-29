@@ -84,7 +84,9 @@ class handler(BaseHTTPRequestHandler):
                     "nickname": nickname,
                     "device_id": device_id,
                     "credits": 3,
-                    "isAdmin": False
+                    "referrals_today": 0,
+                    "last_referral_date": str(date.today()),
+                    "is_admin": False
                 },
                 "access_token": auth_response.session.access_token if auth_response.session else None
             })

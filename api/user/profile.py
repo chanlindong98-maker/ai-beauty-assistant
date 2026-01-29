@@ -59,7 +59,8 @@ class handler(BaseHTTPRequestHandler):
                     "device_id": profile["device_id"],
                     "credits": profile["credits"],
                     "referrals_today": profile["referrals_today"],
-                    "last_referral_date": profile["last_referral_date"]
+                    "last_referral_date": profile["last_referral_date"],
+                    "is_admin": profile.get("is_admin", False)
                 }
             })
 
