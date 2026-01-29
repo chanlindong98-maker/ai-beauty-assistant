@@ -7,13 +7,13 @@ from datetime import date, datetime
 from urllib.parse import urlparse, parse_qs
 from supabase import create_client
 
-# --- 自包含工具函数 (避免 import _utils 失败) ---
+# --- 自包含工具函数 ---
 
 def get_supabase_client():
     url = os.environ.get("SUPABASE_URL", "")
     key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
     if not url or not key:
-        raise ValueError("缺少 Supabase 环境变量 (SUPABASE_URL 或 SUPABASE_SERVICE_ROLE_KEY)")
+        raise ValueError("缺少 Supabase 环境变量")
     return create_client(url, key)
 
 def cors_headers():
@@ -65,8 +65,6 @@ def safe_send_json(handler, data, status=200):
         handler.wfile.write(json.dumps(data, cls=AdminJSONEncoder, ensure_ascii=False).encode("utf-8"))
     except: pass
 
-# --- 处理类 ---
-
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         safe_send_json(self, {})
@@ -79,12 +77,11 @@ class handler(BaseHTTPRequestHandler):
 
     def handle_req(self, method):
         try:
-            # 识别路由 (三重校验：Query 参数 > Path 关键词 > Raw Path全量查找)
+            # 识别路由
             parsed = urlparse(self.path)
             q_params = parse_qs(parsed.query)
             action = q_params.get("action", [None])[0]
             
-            # 如果 Query 参数没拿到，就从整个路径字符串里找关键词
             if not action:
                 raw_path = self.path.lower()
                 if "stats" in raw_path: action = "stats"
@@ -93,26 +90,25 @@ class handler(BaseHTTPRequestHandler):
                 elif "config" in raw_path: action = "config"
                 elif "password" in raw_path: action = "password"
             
-            print(f"[Admin API] Request Path: {self.path}, Method: {method}, Action: {action}")
+            print(f"[Admin API] {method} {self.path} -> {action}")
 
             # 权限检查
             token = get_auth_token(self)
             admin = get_admin_user(token)
             if not admin:
-                safe_send_json(self, {"success": False, "message": "管理员权限验证失败，尝试重新登录"}, 403)
+                safe_send_json(self, {"success": False, "message": "需要管理员权限，请重新登录"}, 403)
                 return
 
             supabase = get_supabase_client()
 
+            # [Stats] 营收统计
             if action == "stats" and method == "GET":
                 u_res = supabase.table("user_profiles").select("id", count="exact").execute()
                 o_res = supabase.table("orders").select("amount").eq("status", "PAID").execute()
                 amounts = [float(i["amount"]) for i in (o_res.data or []) if i.get("amount")]
-                
                 today = str(date.today())
                 t_res = supabase.table("orders").select("amount").eq("status", "PAID").gte("created_at", f"{today}T00:00:00").execute()
                 t_amounts = [float(i["amount"]) for i in (t_res.data or []) if i.get("amount")]
-
                 safe_send_json(self, {
                     "total_users": u_res.count or 0,
                     "total_recharge_amount": sum(amounts),
@@ -121,43 +117,54 @@ class handler(BaseHTTPRequestHandler):
                     "active_users_24h": u_res.count or 0
                 })
 
+            # [Users] 会员列表
             elif action == "users" and method == "GET":
-                q = parse_qs(parsed.query).get("query", [None])[0]
+                q = q_params.get("query", [None])[0]
                 builder = supabase.table("user_profiles").select("*")
                 if q: builder = builder.ilike("nickname", f"%{q}%")
                 res = builder.order("id").limit(100).execute()
                 safe_send_json(self, [{"id":i["id"],"nickname":i["nickname"],"credits":i.get("credits",0),"is_admin":i.get("is_admin",False)} for i in (res.data or [])])
 
+            # [Credits] 修改魔法值 (之前漏掉的部分)
+            elif action == "credits" and method == "POST":
+                data = parse_body(self)
+                user_id = data.get("user_id")
+                credits_val = data.get("credits", 0)
+                mode = data.get("mode", "set")
+                if not user_id:
+                    safe_send_json(self, {"success": False, "message": "缺少用户 ID"}, 400)
+                    return
+                if mode == "add":
+                    curr = supabase.table("user_profiles").select("credits").eq("id", user_id).single().execute()
+                    base = curr.data["credits"] if curr.data else 0
+                    new_credits = base + int(credits_val)
+                else:
+                    new_credits = int(credits_val)
+                new_credits = max(0, new_credits)
+                supabase.table("user_profiles").update({"credits": new_credits}).eq("id", user_id).execute()
+                safe_send_json(self, {"success": True, "message": f"成功更新为 {new_credits} 次", "new_credits": new_credits})
+
+            # [Config] 系统设置
             elif action == "config":
                 if method == "GET":
                     res = supabase.table("system_config").select("*").execute()
                     db_config = {item["key"]: item for item in (res.data or [])}
-                    
                     essential_keys = [
-                        ("gemini_api_key", "Google Gemini API 密钥", os.environ.get("GEMINI_API_KEY", "")),
+                        ("gemini_api_key", "Gemini API 密钥", os.environ.get("GEMINI_API_KEY", "")),
                         ("alipay_app_id", "支付宝 AppID", os.environ.get("ALIPAY_APP_ID", "")),
                         ("alipay_app_private_key", "支付宝应用私钥", os.environ.get("ALIPAY_APP_PRIVATE_KEY", "")),
                         ("alipay_public_key", "支付宝公钥", os.environ.get("ALIPAY_PUBLIC_KEY", "")),
                         ("alipay_notify_url", "支付宝异步回调地址", os.environ.get("ALIPAY_NOTIFY_URL", "")),
                         ("alipay_return_url", "支付宝同步跳转地址", os.environ.get("ALIPAY_RETURN_URL", "")),
                     ]
-                    
                     result = []
                     added = set()
-                    
-                    # 首先添加基础配置项
                     for key, desc, env_val in essential_keys:
-                        if key in db_config:
-                            result.append(db_config[key])
-                        else:
-                            result.append({"key": key, "value": env_val or "", "description": desc})
+                        if key in db_config: result.append(db_config[key])
+                        else: result.append({"key": key, "value": env_val or "", "description": desc})
                         added.add(key)
-                    
-                    # 添加数据库中其他的配置
                     for item in (res.data or []):
-                        if item["key"] not in added:
-                            result.append(item)
-                    
+                        if item["key"] not in added: result.append(item)
                     safe_send_json(self, result)
                 elif method == "POST":
                     items = parse_body(self)
@@ -166,6 +173,7 @@ class handler(BaseHTTPRequestHandler):
                             supabase.table("system_config").upsert({"key":it["key"],"value":it["value"],"description":it.get("description",""),"updated_at":datetime.utcnow().isoformat()}).execute()
                     safe_send_json(self, {"success":True})
 
+            # [Password] 重置密码
             elif action == "password" and method == "POST":
                 pwd = parse_body(self).get("new_password")
                 if not pwd or len(pwd) < 6:
@@ -175,7 +183,8 @@ class handler(BaseHTTPRequestHandler):
                 safe_send_json(self, {"success":True})
             
             else:
-                safe_send_json(self, {"success":False,"message":"Unsupported action"}, 404)
+                safe_send_json(self, {"success":False,"message":f"Unsupported action: {action}"}, 404)
 
         except Exception as e:
-            safe_send_json(self, {"success":False,"message":f"API Error: {str(e)}","trace":traceback.format_exc()}, 500)
+            traceback.print_exc()
+            safe_send_json(self, {"success":False,"message":f"API Error: {str(e)}"}, 500)
