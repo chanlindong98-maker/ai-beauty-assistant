@@ -21,6 +21,5 @@
             "source": "/api/(.*)",
             "destination": "/api/$1"
         }
-    ],
-    "ignoreCommand": "exit 0"
+    ]
 }
