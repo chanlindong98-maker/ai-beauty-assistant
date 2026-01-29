@@ -1,18 +1,20 @@
-"""
-用户登录 API
-POST /api/auth/login
-"""
 import os
 import json
 from http.server import BaseHTTPRequestHandler
-from supabase import create_client
-
 
 def get_supabase():
-    url = os.environ.get("SUPABASE_URL", "")
-    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-    return create_client(url, key)
-
+    """安全获取 Supabase 客户端"""
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    
+    if not url or not key:
+        raise ValueError("缺少 Supabase 环境变量 (SUPABASE_URL 或 SUPABASE_SERVICE_ROLE_KEY)")
+        
+    try:
+        from supabase import create_client
+        return create_client(url, key)
+    except ImportError:
+        raise ImportError("无法在环境中找到 'supabase' 库，请确保 api/requirements.txt 已正确安装")
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -32,53 +34,57 @@ class handler(BaseHTTPRequestHandler):
             password = data.get("password", "")
 
             if not username or not password:
-                self._send_json({"success": False, "message": "请输入用户名和密码"}, 400)
+                self._send_json({"success": False, "message": "请输入用户名和密码哦 🍬"}, 400)
                 return
 
             supabase = get_supabase()
             email = f"{username}@happy-beauty.local"
 
+            # 登录
             auth_response = supabase.auth.sign_in_with_password({
                 "email": email,
                 "password": password,
             })
 
             if not auth_response.user:
-                self._send_json({"success": False, "message": "用户名或密码错误"}, 401)
+                self._send_json({"success": False, "message": "用户名或密码不对哦，再试一次吧"}, 400)
                 return
 
             user_id = auth_response.user.id
-
+            
             # 获取用户资料
             profile_result = supabase.table("user_profiles").select("*").eq("id", user_id).single().execute()
-
+            
             if not profile_result.data:
-                self._send_json({"success": False, "message": "用户资料不存在"}, 404)
+                self._send_json({"success": False, "message": "找不到您的魔法档案，请重新注册"}, 404)
                 return
-
+                
             profile = profile_result.data
 
             self._send_json({
                 "success": True,
-                "message": "欢迎回来！",
+                "message": "欢迎回来！✨",
                 "user": {
-                    "id": user_id,
-                    "username": username,
                     "nickname": profile["nickname"],
                     "device_id": profile["device_id"],
                     "credits": profile["credits"],
-                    "referrals_today": profile["referrals_today"],
-                    "last_referral_date": profile["last_referral_date"]
+                    "isAdmin": profile.get("is_admin", False)
                 },
                 "access_token": auth_response.session.access_token if auth_response.session else None
             })
 
         except Exception as e:
             error_msg = str(e)
-            if "invalid" in error_msg.lower():
-                self._send_json({"success": False, "message": "用户名或密码错误"}, 401)
-            else:
-                self._send_json({"success": False, "message": f"登录失败: {error_msg}"}, 500)
+            status_code = 500
+            user_msg = f"登录失败: {error_msg}"
+            
+            if "credentials" in error_msg.lower() or "invalid" in error_msg.lower():
+                user_msg = "用户名或密码不对哦 🍭"
+                status_code = 401
+            elif "Supabase 环境变量" in error_msg:
+                user_msg = "配置错误：请检查环境变量设置"
+                
+            self._send_json({"success": False, "message": user_msg, "detail": error_msg}, status_code)
 
     def _send_json(self, data: dict, status: int = 200):
         self.send_response(status)
