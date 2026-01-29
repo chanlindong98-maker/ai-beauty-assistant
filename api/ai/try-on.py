@@ -118,21 +118,22 @@ class handler(BaseHTTPRequestHandler):
             # 提取图片
             result_image = None
             debug_log = []
-            v_time = "20260130-0020" # 强制部署版本
+            v_time = "20260130-0025" # 深度诊断版
+            model_text = ""
             
             try:
                 # 检查 parts 是否存在
                 if not hasattr(response, 'parts') or not response.parts:
-                    debug_log.append("NoPartsInResponse")
+                    debug_log.append("EmptyParts")
                 else:
                     for i, part in enumerate(response.parts):
-                        ptype = "unknown"
-                        if hasattr(part, "text"): ptype = f"text({len(part.text)})"
+                        if hasattr(part, "text") and part.text:
+                            model_text = part.text
+                            debug_log.append(f"T{i}")
                         if hasattr(part, "inline_data") and part.inline_data: 
-                            ptype = "image"
                             result_image = f"data:image/jpeg;base64,{part.inline_data.data}"
+                            debug_log.append(f"I{i}")
                             break
-                        debug_log.append(f"P{i}:{ptype}")
                 
                 if not result_image:
                     f_reason = "Unknown"
@@ -142,14 +143,24 @@ class handler(BaseHTTPRequestHandler):
                     safety_info = []
                     try:
                         for rating in response.candidates[0].safety_ratings:
-                            if rating.probability != "NEGLIGIBLE":
-                                safety_info.append(f"{rating.category}:{rating.probability}")
+                            # 修正枚举比较
+                            if hasattr(rating.probability, "name"):
+                                p_name = rating.probability.name
+                            else:
+                                p_name = str(rating.probability)
+                                
+                            if p_name != "NEGLIGIBLE":
+                                safety_info.append(f"{rating.category}:{p_name}")
                     except: pass
                     
+                    err_msg = f"[{v_time}] AI 未能生成图像 | 原因: {f_reason} | 风险: {','.join(safety_info) if safety_info else 'None'}"
+                    if model_text:
+                        err_msg += f" | AI解释: {model_text[:50]}"
+                        
                     self._send_json({
                         "success": False, 
-                        "message": f"[{v_time}] AI 未能生成图像 | 原因: {f_reason} | 风险: {','.join(safety_info) if safety_info else 'None'}",
-                        "debug": " | ".join(debug_log)
+                        "message": err_msg,
+                        "debug": "/".join(debug_log)
                     }, 500)
                     return
             except Exception as pe:
