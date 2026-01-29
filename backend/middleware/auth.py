@@ -86,4 +86,12 @@ async def get_optional_user(
     except Exception:
         pass
     
-    return None
+async def get_admin_user(
+    current_user: dict = Depends(get_current_user)
+) -> dict:
+    """
+    验证当前用户是否为管理员
+    """
+    if not current_user.get("is_admin", False):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    return current_user

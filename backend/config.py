@@ -21,7 +21,18 @@ class Settings(BaseSettings):
     
     # 应用配置
     debug: bool = False
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    cors_origins: list[str] = [
+        "http://localhost:5173", "http://localhost:3000", "http://localhost:3001",
+        "http://127.0.0.1:5173", "http://127.0.0.1:3000", "http://127.0.0.1:3001"
+    ]
+    # 支付宝配置
+    alipay_app_id: str = ""
+    alipay_app_private_key: str = ""
+    alipay_public_key: str = ""
+    alipay_sign_type: str = "RSA2"
+    alipay_debug: bool = True  # 沙箱模式默认为 True
+    alipay_notify_url: str = ""
+    alipay_return_url: str = ""
     
     class Config:
         env_file = ".env"

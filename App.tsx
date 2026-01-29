@@ -4,9 +4,10 @@ import { BodyType, AppTab, User } from './types';
 import ImagePicker from './components/ImagePicker';
 import LoadingOverlay from './components/LoadingOverlay';
 import * as api from './services/api';
+import AdminDashboard from './components/AdminDashboard';
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<'home' | 'profile'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'profile' | 'admin'>('home');
   const [activeTab, setActiveTab] = useState<AppTab>('clothing');
   const [loading, setLoading] = useState(false);
   const [resultImage, setResultImage] = useState<string | null>(null);
@@ -23,6 +24,11 @@ const App: React.FC = () => {
   const [nicknameInput, setNicknameInput] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [redeemCodeInput, setRedeemCodeInput] = useState('');
+  const [redeemLoading, setRedeemLoading] = useState(false);
+  const [showRecharge, setShowRecharge] = useState(false);
+  const [rechargeLoading, setRechargeLoading] = useState(false);
 
   // Form States
   const [cFace, setCFace] = useState<string | null>(null);
@@ -41,21 +47,51 @@ const App: React.FC = () => {
   // 初始化：检查登录状态
   useEffect(() => {
     const initAuth = async () => {
-      if (api.isAuthenticated()) {
-        const profile = await api.getProfile();
-        if (profile) {
-          setUser({
-            nickname: profile.nickname,
-            deviceId: profile.device_id,
-            credits: profile.credits,
-            referralsToday: profile.referrals_today,
-            lastReferralDate: profile.last_referral_date
-          });
+      try {
+        if (api.isAuthenticated()) {
+          const profile = await api.getProfile();
+          if (profile) {
+            setUser({
+              nickname: profile.nickname,
+              deviceId: profile.device_id,
+              credits: profile.credits,
+              referralsToday: profile.referrals_today,
+              lastReferralDate: profile.last_referral_date,
+              isAdmin: profile.is_admin
+            });
+          }
         }
+      } catch (err) {
+        console.error("初始化登录状态失败:", err);
+      } finally {
+        setIsInitialLoading(false);
       }
     };
     initAuth();
   }, []);
+
+  // 监听 Hash 变化，实现简易路由 (如 /#admin)
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash === '#admin') {
+        if (user) {
+          if (user.isAdmin) {
+            setCurrentView('admin');
+          } else {
+            alert('🚫 您没有管理员权限哦！如果已运行 SQL 提权，请尝试重新登录。');
+            window.location.hash = ''; // 清除 hash
+          }
+        } else if (!isInitialLoading) {
+          setShowAuth(true); // 如果未登录，弹出登录框
+        }
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    handleHashChange(); // 初始加载时也检查一次
+
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [user, isInitialLoading]);
 
   /**
    * 处理用户登录/注册
@@ -88,7 +124,8 @@ const App: React.FC = () => {
             deviceId: result.user.device_id,
             credits: result.user.credits,
             referralsToday: result.user.referrals_today,
-            lastReferralDate: result.user.last_referral_date
+            lastReferralDate: result.user.last_referral_date,
+            isAdmin: result.user.is_admin
           });
           setShowAuth(false);
           // 清除 URL 中的 ref 参数
@@ -111,7 +148,8 @@ const App: React.FC = () => {
             deviceId: result.user.device_id,
             credits: result.user.credits,
             referralsToday: result.user.referrals_today,
-            lastReferralDate: result.user.last_referral_date
+            lastReferralDate: result.user.last_referral_date,
+            isAdmin: result.user.is_admin
           });
           setShowAuth(false);
         } else {
@@ -145,6 +183,57 @@ const App: React.FC = () => {
     const shareLink = `${window.location.origin}${window.location.pathname}?ref=${user.deviceId}`;
     navigator.clipboard.writeText(shareLink);
     alert("✨ 专属邀请链接已复制！\n\n发送给好友，当TA使用新设备注册账号后，你将自动获得 1 次魔法值奖励！🎁");
+  };
+
+  /**
+   * 处理兑换码
+   */
+  const handleRedeem = async () => {
+    if (!redeemCodeInput.trim()) {
+      alert("请输入兑换码哦 🍬");
+      return;
+    }
+
+    setRedeemLoading(true);
+    try {
+      const result = await api.redeemCode(redeemCodeInput);
+      if (result.success && result.data) {
+        setUser(prev => prev ? { ...prev, credits: result.data!.credits } : null);
+        setRedeemCodeInput('');
+        alert(result.message);
+      } else {
+        alert(result.message || "兑换失败");
+      }
+    } catch (err: any) {
+      alert(err.message || "兑换失败，请检查兑换码是否正确");
+    } finally {
+      setRedeemLoading(false);
+    }
+  };
+
+  /**
+   * 处理充值
+   */
+  const handleRecharge = async (amount: number, credits: number) => {
+    if (!user) {
+      setShowAuth(true);
+      return;
+    }
+
+    setRechargeLoading(true);
+    try {
+      const result = await api.createAlipayOrder(amount, credits);
+      if (result.success && result.pay_url) {
+        // 在新窗口打开支付宝支付页面
+        window.location.href = result.pay_url;
+      } else {
+        alert(result.message || "创建支付订单失败");
+      }
+    } catch (err: any) {
+      alert(err.message || "支付跳转失败，请重试");
+    } finally {
+      setRechargeLoading(false);
+    }
   };
 
   /**
@@ -253,9 +342,21 @@ const App: React.FC = () => {
     </button>
   );
 
+  // 如果是管理后台视图，则渲染完全独立的 UI
+  if (currentView === 'admin' && user?.isAdmin) {
+    return (
+      <AdminDashboard
+        onClose={() => {
+          setCurrentView('profile');
+          window.location.hash = ''; // 同步清除 hash
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#fdfcfb]">
-      {loading && <LoadingOverlay message="魔法生成中，请稍等哦 ✨" />}
+      {(loading || isInitialLoading) && <LoadingOverlay message={isInitialLoading ? "正在恢复魔法能量..." : "魔法生成中，请稍等哦 ✨"} />}
 
       {/* Auth Modal */}
       {showAuth && (
@@ -457,6 +558,14 @@ const App: React.FC = () => {
                   <div>
                     <h2 className="text-2xl font-happy text-gray-700">{user.nickname}</h2>
                     <div className="mt-1 inline-block px-3 py-1 bg-gray-100 rounded-full text-[10px] font-bold text-gray-400 uppercase tracking-widest">本机 ID: ...{user.deviceId.slice(-6)}</div>
+                    {user.isAdmin && (
+                      <button
+                        onClick={() => setCurrentView('admin')}
+                        className="mt-3 block mx-auto px-4 py-1.5 bg-gray-800 text-white text-[10px] font-bold rounded-full hover:bg-black transition-all bouncy"
+                      >
+                        管理员后台 ⚙️
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -464,6 +573,12 @@ const App: React.FC = () => {
                   <div className="glass-card p-8 rounded-[2.5rem] text-center border-pink-100">
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">剩余魔法次数</p>
                     <div className="text-6xl font-happy text-pink-500">{user.credits}</div>
+                    <button
+                      onClick={() => setShowRecharge(true)}
+                      className="mt-4 px-6 py-2 bg-pink-100 text-pink-500 rounded-full text-xs font-bold bouncy"
+                    >
+                      + 充值次数
+                    </button>
                   </div>
 
                   <div className="glass-card p-8 rounded-[2.5rem] space-y-6">
@@ -478,6 +593,29 @@ const App: React.FC = () => {
                     <button onClick={handleShare} className="w-full candy-button py-5 font-bold bouncy flex items-center justify-center gap-3 text-lg">
                       <span>🚀</span> 立即分享链接
                     </button>
+                  </div>
+
+                  <div className="glass-card p-8 rounded-[2.5rem] space-y-4">
+                    <div className="text-center space-y-1">
+                      <h3 className="text-lg font-happy text-blue-500">魔法兑换处 🎟️</h3>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">输入神秘代码获取能量</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="输入兑换码..."
+                        value={redeemCodeInput}
+                        onChange={(e) => setRedeemCodeInput(e.target.value)}
+                        className="flex-1 px-4 py-3 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-blue-300 outline-none font-bold text-gray-600 text-sm"
+                      />
+                      <button
+                        onClick={handleRedeem}
+                        disabled={redeemLoading}
+                        className="px-6 py-3 bg-blue-500 text-white font-bold rounded-2xl bouncy disabled:opacity-50 text-sm shadow-md"
+                      >
+                        {redeemLoading ? '...' : '兑换'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -523,6 +661,51 @@ const App: React.FC = () => {
           </button>
         </div>
       </nav>
+
+      {/* Recharge Modal */}
+      {showRecharge && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6 overflow-y-auto">
+          <div className="glass-card w-full max-w-sm p-8 rounded-[3rem] text-center space-y-6 animate-in zoom-in duration-300 relative">
+            <button onClick={() => setShowRecharge(false)} className="absolute top-6 right-6 text-gray-300">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="w-16 h-16 bg-blue-400 rounded-full flex items-center justify-center text-3xl mx-auto shadow-lg">⚡</div>
+            <div>
+              <h2 className="text-2xl font-happy text-blue-500">魔法能量补给</h2>
+              <p className="text-[10px] text-gray-400 mt-2 font-bold uppercase tracking-widest">选择你的补给包</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              {[
+                { amount: 9.9, credits: 10, label: '初级瓶 (10次)' },
+                { amount: 39.9, credits: 50, label: '进阶罐 (50次)', hot: true },
+                { amount: 69.9, credits: 100, label: '终极箱 (100次)' },
+              ].map((plan) => (
+                <button
+                  key={plan.credits}
+                  onClick={() => handleRecharge(plan.amount, plan.credits)}
+                  disabled={rechargeLoading}
+                  className="group relative flex items-center justify-between p-4 rounded-2xl bg-gray-50 border-2 border-gray-100 hover:border-blue-300 transition-all bouncy"
+                >
+                  <div className="text-left">
+                    <div className="text-sm font-bold text-gray-700">{plan.label}</div>
+                    <div className="text-[10px] text-gray-400 font-bold">￥{plan.amount}</div>
+                  </div>
+                  <div className="text-blue-500 text-xl font-happy">Go!</div>
+                  {plan.hot && (
+                    <div className="absolute -top-2 -right-2 bg-red-400 text-white text-[8px] font-bold px-2 py-0.5 rounded-full">超值</div>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-[10px] text-gray-400 font-bold leading-relaxed px-4 italic">
+              * 支付完成后请手动刷新浏览器确认次数更新。<br />
+              沙箱环境测试请下载“支付宝沙箱钱包”。
+            </p>
+          </div>
+        </div>
+      )}
 
       <footer className="mt-auto px-10 py-6 text-center opacity-30 pb-32">
         <p className="text-[10px] text-gray-500 font-bold uppercase tracking-[0.2em]">Happy Beauty Magic Lab<br />© 2025 魅丽变变变</p>

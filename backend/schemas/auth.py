@@ -9,6 +9,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, description="用户名")
     password: str = Field(..., min_length=6, description="密码")
     nickname: str = Field(..., min_length=1, max_length=50, description="昵称")
+    device_id: str = Field(..., description="设备 ID (由客户端生成)")
     referrer_id: str | None = Field(None, description="推荐人设备 ID")
 
 
@@ -35,3 +36,4 @@ class UserProfile(BaseModel):
     credits: int
     referrals_today: int
     last_referral_date: str
+    is_admin: bool = False

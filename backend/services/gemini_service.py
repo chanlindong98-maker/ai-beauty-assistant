@@ -4,14 +4,48 @@ Gemini AI 服务模块
 封装所有与 Google Gemini API 的交互逻辑
 """
 import google.generativeai as genai
+import base64
+import asyncio
+from google.api_core import exceptions
 from config import get_settings
+from services.config_service import get_config
 
 
 def get_gemini_client():
     """初始化并返回 Gemini 客户端"""
-    settings = get_settings()
-    genai.configure(api_key=settings.gemini_api_key)
+    # 优先从数据库动态配置获取 API Key
+    api_key = get_config("gemini_api_key")
+    genai.configure(api_key=api_key)
     return genai
+
+
+async def call_gemini_with_retry(model, contents, generation_config=None, max_retries=3):
+    """
+    带重试机制的 Gemini API 调用
+    支持指数退避处理 429 错误
+    """
+    for attempt in range(max_retries):
+        try:
+            if generation_config:
+                return await asyncio.to_thread(
+                    model.generate_content,
+                    contents=contents,
+                    generation_config=generation_config
+                )
+            else:
+                return await asyncio.to_thread(
+                    model.generate_content,
+                    contents=contents
+                )
+        except exceptions.ResourceExhausted:
+            if attempt == max_retries - 1:
+                raise
+            wait_time = (attempt + 1) * 2  # 2s, 4s
+            print(f"Gemini API 429 频率受限，{wait_time}秒后重试第 {attempt + 1} 次...")
+            await asyncio.sleep(wait_time)
+        except Exception as e:
+            # 其他错误不重试，直接抛出
+            raise e
 
 
 async def generate_try_on_image(
@@ -61,21 +95,26 @@ async def generate_try_on_image(
     else:
         prompt = """生成一张高度写实的人脸近照。
         参考第一张图中的人脸，参考第二张图中的耳饰。
-        要求：将这款耳饰自然地戴在图中人的耳朵上。
-        耳饰的细节（材质、反光、吊坠）应清晰可见。保持五官特征和肤色真实。
-        输出必须是戴上耳饰后的效果图。"""
+        要求：
+        1. 将这款耳饰自然地戴在图中人的耳朵上。
+        2. 如果第一张图是正面照，请确保【左右两只耳朵】都佩戴上这款耳饰，并保持对称自然。
+        3. 耳饰的细节（材质、反光、吊坠）应清晰可见，与环境光影和谐。
+        保持五官特征和肤色真实。输出必须是佩戴耳饰后的效果图。"""
     
     # 调用 Gemini API
     model = genai.GenerativeModel("gemini-2.5-flash-image")
-    response = model.generate_content(
-        contents=[face_part, item_part, prompt],
-        generation_config={"image_config": {"aspect_ratio": "3:4"}}
+    response = await call_gemini_with_retry(
+        model=model,
+        contents=[face_part, item_part, prompt]
     )
     
     # 提取图片
     for part in response.parts:
         if hasattr(part, "inline_data") and part.inline_data:
-            return part.inline_data.data
+            data = part.inline_data.data
+            if isinstance(data, bytes):
+                return base64.b64encode(data).decode('utf-8')
+            return str(data)
     
     raise ValueError("AI 未能生成有效的图像")
 
@@ -136,7 +175,8 @@ async def analyze_tcm(
         system_instruction=system_instruction
     )
     
-    response = model.generate_content(
+    response = await call_gemini_with_retry(
+        model=model,
         contents=[image_part, prompt],
         generation_config={"temperature": 0.7}
     )
@@ -192,7 +232,8 @@ async def generate_hairstyle(
     语言要专业且富有亲和力。"""
     
     analysis_model = genai.GenerativeModel("gemini-2.0-flash")
-    analysis_response = analysis_model.generate_content(
+    analysis_response = await call_gemini_with_retry(
+        model=analysis_model,
         contents=[image_part, analysis_prompt]
     )
     analysis_text = analysis_response.text or "未能生成分析。"
@@ -206,9 +247,9 @@ async def generate_hairstyle(
     - 背景简洁专业。"""
     
     image_model = genai.GenerativeModel("gemini-2.5-flash-image")
-    rec_response = image_model.generate_content(
-        contents=[image_part, rec_prompt],
-        generation_config={"image_config": {"aspect_ratio": "3:4"}}
+    rec_response = await call_gemini_with_retry(
+        model=image_model,
+        contents=[image_part, rec_prompt]
     )
     
     # 3. 生成发型目录图
@@ -220,16 +261,20 @@ async def generate_hairstyle(
     4. **多样性**：10种风格迥异的{gender_term}发型，绝不重复。
     5. **排版**：整齐网格排版。"""
     
-    cat_response = image_model.generate_content(
-        contents=[image_part, cat_prompt],
-        generation_config={"image_config": {"aspect_ratio": "3:4"}}
+    cat_response = await call_gemini_with_retry(
+        model=image_model,
+        contents=[image_part, cat_prompt]
     )
     
     def extract_image(response) -> str:
         """从响应中提取图片 base64"""
         for part in response.parts:
             if hasattr(part, "inline_data") and part.inline_data:
-                return part.inline_data.data
+                data = part.inline_data.data
+                # 如果是 bytes，转换为 base64 字符串
+                if isinstance(data, bytes):
+                    return base64.b64encode(data).decode('utf-8')
+                return str(data)
         return ""
     
     return {

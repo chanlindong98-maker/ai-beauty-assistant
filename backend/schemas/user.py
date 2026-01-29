@@ -14,6 +14,11 @@ class ProcessReferralRequest(BaseModel):
     new_user_device_id: str = Field(..., description="新用户的设备 ID")
 
 
+class RedeemRequest(BaseModel):
+    """兑换码兑换请求"""
+    code: str = Field(..., description="兑换码")
+
+
 class UserResponse(BaseModel):
     """用户响应"""
     success: bool

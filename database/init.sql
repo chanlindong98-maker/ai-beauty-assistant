@@ -9,7 +9,7 @@
 CREATE TABLE IF NOT EXISTS public.user_profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     nickname TEXT NOT NULL,
-    device_id TEXT NOT NULL UNIQUE,
+    device_id TEXT NOT NULL,
     credits INTEGER DEFAULT 3 CHECK (credits >= 0),
     referrals_today INTEGER DEFAULT 0 CHECK (referrals_today >= 0),
     last_referral_date DATE DEFAULT CURRENT_DATE,

@@ -14,6 +14,7 @@ export interface User {
   credits: number;
   referralsToday: number;
   lastReferralDate: string;
+  isAdmin: boolean;
 }
 
 export interface TryOnRequest {
