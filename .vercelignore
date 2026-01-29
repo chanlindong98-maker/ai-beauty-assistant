@@ -1,0 +1,25 @@
+# 忽略本地开发后端目录（使用 api/ 目录作为 Vercel Serverless Functions）
+backend/
+
+# 开发和测试文件
+*.md
+!README.md
+
+# 本地环境文件
+.env
+.env.local
+*.env
+
+# 数据库相关
+database/
+
+# IDE 和编辑器
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Node.js
+node_modules/
