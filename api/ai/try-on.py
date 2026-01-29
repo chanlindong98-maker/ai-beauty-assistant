@@ -129,7 +129,7 @@ class handler(BaseHTTPRequestHandler):
                         if hasattr(part, "text"): ptype = f"text({len(part.text)})"
                         if hasattr(part, "inline_data") and part.inline_data: 
                             ptype = "image"
-                            result_image = f"data:image/png;base64,{part.inline_data.data}"
+                            result_image = f"data:image/jpeg;base64,{part.inline_data.data}"
                             break
                         debug_log.append(f"P{i}:{ptype}")
                 

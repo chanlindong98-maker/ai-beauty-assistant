@@ -165,8 +165,8 @@ class handler(BaseHTTPRequestHandler):
                 "success": True,
                 "message": "推荐完成",
                 "analysis": analysis_text,
-                "recommended_image": f"data:image/png;base64,{rec_image}",
-                "catalog_image": f"data:image/png;base64,{cat_image}"
+                "recommended_image": f"data:image/jpeg;base64,{rec_image}",
+                "catalog_image": f"data:image/jpeg;base64,{cat_image}"
             })
             print("[Hairstyle] Success")
 
