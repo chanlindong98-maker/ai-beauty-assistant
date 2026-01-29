@@ -73,7 +73,7 @@ class handler(BaseHTTPRequestHandler):
             image_data = image.split(",")[1] if "," in image else image
 
             # 配置 Gemini
-            genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
+            genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""), transport='rest')
             
             # 构建提示词
             system_instruction = "你是一位拥有深厚底蕴的中医及传统文化学者。"
@@ -124,7 +124,13 @@ class handler(BaseHTTPRequestHandler):
             })
 
         except Exception as e:
-            self._send_json({"success": False, "message": f"分析失败: {str(e)}"}, 500)
+            msg = str(e)
+            if "404" in msg:
+                try:
+                    models = [m.name for m in genai.list_models()]
+                    msg += f" | Available models: {', '.join(models[:5])}"
+                except: pass
+            self._send_json({"success": False, "message": f"分析失败: {msg}"}, 500)
 
     def _send_json(self, data: dict, status: int = 200):
         self.send_response(status)
