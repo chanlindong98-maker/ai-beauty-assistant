@@ -11,6 +11,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     const [config, setConfig] = useState<api.SystemConfigItem[]>([]);
     const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'config' | 'security'>('stats');
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [showKeys, setShowKeys] = useState<{ [key: string]: boolean }>({});
 
@@ -21,6 +22,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     const loadData = async () => {
         setLoading(true);
         try {
+            setError(null);
             if (activeTab === 'stats') {
                 const s = await api.getAdminStats();
                 setStats(s);
@@ -33,6 +35,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
             }
         } catch (err) {
             console.error('Admin Load Error:', err);
+            setError((err as Error).message || '数据加载失败，请检查数据库配置');
         } finally {
             setLoading(false);
         }
@@ -166,7 +169,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                         </div>
                     )}
 
-                    {!loading && activeTab === 'stats' && stats && (
+                    {error && (
+                        <div className="bg-rose-50 border border-rose-100 rounded-2xl p-8 text-center animate-in fade-in zoom-in duration-300">
+                            <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                            </div>
+                            <h3 className="text-lg font-bold text-slate-800 mb-2">数据加载异常</h3>
+                            <p className="text-sm text-slate-500 mb-6">{error}</p>
+                            {error.includes('orders') && (
+                                <p className="text-xs text-indigo-500 font-bold mb-6">提示：这通常是因为数据库缺少 orders 表，请在数据库运行补全脚本。</p>
+                            )}
+                            <button onClick={loadData} className="px-6 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-black transition-all">重试加载</button>
+                        </div>
+                    )}
+
+                    {!loading && !error && activeTab === 'stats' && stats && (
                         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                                 {[
@@ -217,7 +234,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                         </div>
                     )}
 
-                    {!loading && activeTab === 'users' && (
+                    {!loading && !error && activeTab === 'users' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
                             <div className="flex items-center justify-between">
                                 <div className="relative group flex-1 max-w-md">
@@ -289,7 +306,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                         </div>
                     )}
 
-                    {!loading && activeTab === 'config' && (
+                    {!loading && !error && activeTab === 'config' && (
                         <div className="space-y-10 max-w-4xl animate-in fade-in slide-in-from-bottom-2 duration-500">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
@@ -342,7 +359,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                         </div>
                     )}
 
-                    {!loading && activeTab === 'security' && (
+                    {!loading && !error && activeTab === 'security' && (
                         <div className="space-y-10 max-w-xl animate-in fade-in slide-in-from-bottom-2 duration-500">
                             <div className="space-y-1">
                                 <h3 className="font-bold text-slate-800 text-lg">系统权限设置</h3>
