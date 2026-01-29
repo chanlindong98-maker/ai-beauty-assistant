@@ -1,14 +1,20 @@
 import os
 import json
+import sys
 from http.server import BaseHTTPRequestHandler
 import google.generativeai as genai
+
+# 导入共享工具模块
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from _utils import get_config
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
-            api_key = os.environ.get("GEMINI_API_KEY", "")
+            # 优先从数据库读取 API 密钥
+            api_key = get_config("gemini_api_key")
             if not api_key:
-                self._send_json({"success": False, "message": "环境变量中未配置 GEMINI_API_KEY"}, 500)
+                self._send_json({"success": False, "message": "未配置 Gemini API 密钥，请在管理后台设置"}, 500)
                 return
 
             genai.configure(api_key=api_key, transport='rest')

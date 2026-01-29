@@ -4,9 +4,14 @@ POST /api/ai/analyze
 """
 import os
 import json
+import sys
 from http.server import BaseHTTPRequestHandler
 from supabase import create_client
 import google.generativeai as genai
+
+# 导入共享工具模块
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from _utils import get_config
 
 
 def get_supabase():
@@ -72,8 +77,12 @@ class handler(BaseHTTPRequestHandler):
 
             image_data = image.split(",")[1] if "," in image else image
 
-            # 配置 Gemini
-            genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""), transport='rest')
+            # 配置 Gemini (优先从数据库读取 API 密钥)
+            api_key = get_config("gemini_api_key")
+            if not api_key:
+                self._send_json({"success": False, "message": "未配置 Gemini API 密钥，请在管理后台设置"}, 500)
+                return
+            genai.configure(api_key=api_key, transport='rest')
             
             # 构建提示词
             system_instruction = "你是一位拥有深厚底蕴的中医及传统文化学者。"

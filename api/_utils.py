@@ -107,3 +107,34 @@ def send_json(handler, data: dict, status: int = 200):
     handler.send_header("Content-Type", "application/json")
     handler.end_headers()
     handler.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
+
+
+def get_config(key: str, default: str = "") -> str:
+    """
+    获取动态配置项
+    
+    优先从数据库 system_config 表读取，如果不存在则回退到环境变量
+    
+    Args:
+        key: 配置项的键名（如 gemini_api_key）
+        default: 默认值
+    
+    Returns:
+        配置值
+    """
+    # 1. 尝试从数据库读取
+    try:
+        supabase = get_supabase_client()
+        res = supabase.table("system_config").select("value").eq("key", key).single().execute()
+        if res.data and res.data.get("value"):
+            return res.data["value"]
+    except Exception:
+        pass
+    
+    # 2. 回退到环境变量（将 key 转为大写下划线格式）
+    env_key = key.upper()
+    env_value = os.environ.get(env_key, "")
+    if env_value:
+        return env_value
+    
+    return default
