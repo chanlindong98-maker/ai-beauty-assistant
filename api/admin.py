@@ -79,19 +79,21 @@ class handler(BaseHTTPRequestHandler):
 
     def handle_req(self, method):
         try:
-            # 识别路由 (支持路径匹配和 Action 参数)
+            # 识别路由 (三重校验：Query 参数 > Path 关键词 > Raw Path全量查找)
             parsed = urlparse(self.path)
             q_params = parse_qs(parsed.query)
             action = q_params.get("action", [None])[0]
             
+            # 如果 Query 参数没拿到，就从整个路径字符串里找关键词
             if not action:
-                if "stats" in parsed.path: action = "stats"
-                elif "users" in parsed.path: action = "users"
-                elif "credits" in parsed.path: action = "credits"
-                elif "config" in parsed.path: action = "config"
-                elif "password" in parsed.path: action = "password"
+                raw_path = self.path.lower()
+                if "stats" in raw_path: action = "stats"
+                elif "users" in raw_path: action = "users"
+                elif "credits" in raw_path: action = "credits"
+                elif "config" in raw_path: action = "config"
+                elif "password" in raw_path: action = "password"
             
-            print(f"[Admin API] Action detected: {action}")
+            print(f"[Admin API] Request Path: {self.path}, Method: {method}, Action: {action}")
 
             # 权限检查
             token = get_auth_token(self)
