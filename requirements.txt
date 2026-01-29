@@ -1,5 +1,0 @@
-# Vercel Serverless Functions 依赖
-# 注意：这是给 Vercel 使用的，不是给本地后端开发使用的
-supabase>=2.3.0
-google-generativeai>=0.8.0
-pyjwt>=2.8.0
