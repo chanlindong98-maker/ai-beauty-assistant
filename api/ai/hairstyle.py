@@ -104,15 +104,14 @@ class handler(BaseHTTPRequestHandler):
             analysis_text = analysis_response.text or "未能生成分析"
 
             # 生成推荐发型图片
-            image_model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")
+            image_model = genai.GenerativeModel("gemini-2.0-flash-exp")
             
             rec_prompt = f"""生成一张高度写实的正面照片。
             必须使用原图中的人物面部，为这位{age}岁的人物换上一款完美的{gender_term}发型。
             背景简洁专业。"""
             
             rec_response = image_model.generate_content(
-                contents=[image_part, rec_prompt],
-                generation_config={"response_mime_type": "image/png"}
+                contents=[image_part, rec_prompt]
             )
             
             rec_image = extract_image(rec_response)
@@ -122,8 +121,7 @@ class handler(BaseHTTPRequestHandler):
             展示10种风格迥异的发型，整齐网格排版。"""
             
             cat_response = image_model.generate_content(
-                contents=[image_part, cat_prompt],
-                generation_config={"response_mime_type": "image/png"}
+                contents=[image_part, cat_prompt]
             )
             
             cat_image = extract_image(cat_response)
