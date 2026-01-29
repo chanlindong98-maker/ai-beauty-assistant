@@ -111,13 +111,29 @@ class handler(BaseHTTPRequestHandler):
 
             # 提取图片
             result_image = None
-            for part in response.parts:
-                if hasattr(part, "inline_data") and part.inline_data:
-                    result_image = f"data:image/png;base64,{part.inline_data.data}"
-                    break
+            try:
+                parts_str = []
+                for i, part in enumerate(response.parts):
+                    p_type = "unknown"
+                    if hasattr(part, "text"): p_type = "text"
+                    if hasattr(part, "inline_data"): p_type = "inline_data"
+                    parts_str.append(f"Part {i}: {p_type}")
+                    if hasattr(part, "inline_data") and part.inline_data:
+                        result_image = f"data:image/png;base64,{part.inline_data.data}"
+                        break
+                print(f"[Try-On] Response Parts: {', '.join(parts_str)}")
+            except Exception as pe:
+                print(f"[Try-On] Part Access Error: {str(pe)}")
 
             if not result_image:
-                self._send_json({"success": False, "message": "AI 未能生成图像"}, 500)
+                finish_reason = "Unknown"
+                try: finish_reason = str(response.candidates[0].finish_reason)
+                except: pass
+                self._send_json({
+                    "success": False, 
+                    "message": f"AI 未能生成图像 (原因: {finish_reason})",
+                    "debug_info": f"Parts: {len(response.parts) if hasattr(response, 'parts') else 0}"
+                }, 500)
                 return
 
             self._send_json({
