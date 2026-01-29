@@ -3,23 +3,23 @@
     "rewrites": [
         {
             "source": "/api/admin_stats",
-            "destination": "/api/admin"
+            "destination": "/api/admin?action=stats"
         },
         {
             "source": "/api/admin_users",
-            "destination": "/api/admin"
+            "destination": "/api/admin?action=users"
         },
         {
             "source": "/api/admin_credits",
-            "destination": "/api/admin"
+            "destination": "/api/admin?action=credits"
         },
         {
             "source": "/api/admin_config",
-            "destination": "/api/admin"
+            "destination": "/api/admin?action=config"
         },
         {
             "source": "/api/admin_reset_password",
-            "destination": "/api/admin"
+            "destination": "/api/admin?action=password"
         },
         {
             "source": "/api/(.*)",

@@ -79,14 +79,19 @@ class handler(BaseHTTPRequestHandler):
 
     def handle_req(self, method):
         try:
-            # 识别路由
+            # 识别路由 (支持路径匹配和 Action 参数)
             parsed = urlparse(self.path)
-            action = "unknown"
-            if "stats" in parsed.path: action = "stats"
-            elif "users" in parsed.path: action = "users"
-            elif "credits" in parsed.path: action = "credits"
-            elif "config" in parsed.path: action = "config"
-            elif "password" in parsed.path: action = "password"
+            q_params = parse_qs(parsed.query)
+            action = q_params.get("action", [None])[0]
+            
+            if not action:
+                if "stats" in parsed.path: action = "stats"
+                elif "users" in parsed.path: action = "users"
+                elif "credits" in parsed.path: action = "credits"
+                elif "config" in parsed.path: action = "config"
+                elif "password" in parsed.path: action = "password"
+            
+            print(f"[Admin API] Action detected: {action}")
 
             # 权限检查
             token = get_auth_token(self)
