@@ -116,8 +116,17 @@ class handler(BaseHTTPRequestHandler):
             必须使用原图中的人物面部，为这位{age}岁的人物换上一款完美的{gender_term}发型。
             背景简洁专业。"""
             
+            # 放宽安全限制
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
+
             rec_response = image_model.generate_content(
-                contents=[image_part, rec_prompt]
+                contents=[image_part, rec_prompt],
+                safety_settings=safety_settings
             )
             
             rec_image = extract_image(rec_response)
@@ -127,19 +136,28 @@ class handler(BaseHTTPRequestHandler):
             展示10种风格迥异的发型，整齐网格排版。"""
             
             cat_response = image_model.generate_content(
-                contents=[image_part, cat_prompt]
+                contents=[image_part, cat_prompt],
+                safety_settings=safety_settings
             )
             
             cat_image = extract_image(cat_response)
 
+            v_tag = "[20260130-V2]" # 诊断版本
             if not rec_image or not cat_image:
                 f_reason = "Unknown"
                 try: f_reason = str(rec_response.candidates[0].finish_reason)
                 except: pass
+                
+                safety_msg = "None"
+                try:
+                    risks = [f"{r.category}:{r.probability}" for r in rec_response.candidates[0].safety_ratings if r.probability != "NEGLIGIBLE"]
+                    if risks: safety_msg = ",".join(risks)
+                except: pass
+
                 self._send_json({
                     "success": False, 
-                    "message": f"AI 未能生成发型图像 (原因: {f_reason})",
-                    "debug": "Image Extraction Failed"
+                    "message": f"{v_tag} AI 未能生成发型图像 | 原因: {f_reason} | 风险: {safety_msg}",
+                    "debug": "Extraction Failed"
                 }, 500)
                 return
 

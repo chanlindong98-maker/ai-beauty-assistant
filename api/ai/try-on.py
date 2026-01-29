@@ -100,26 +100,34 @@ class handler(BaseHTTPRequestHandler):
             # 调用 Gemini
             # 调用 Gemini
             model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")
-            print(f"[Try-On] Prompt: {prompt[:50]}...")
             
-            face_part = {"inline_data": {"mime_type": "image/jpeg", "data": face_data}}
-            item_part = {"inline_data": {"mime_type": "image/jpeg", "data": item_data}}
+            # 极致放宽安全限制，防止误拦截
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
             
             response = model.generate_content(
-                contents=[face_part, item_part, prompt]
+                contents=[face_part, item_part, prompt],
+                safety_settings=safety_settings
             )
 
             # 提取图片
             result_image = None
             debug_log = []
-            v_time = "20260130-0010" # 版本标识
+            v_time = "20260130-0015" # 最新诊断版本
             
             try:
-                if hasattr(response, 'parts'):
+                # 检查 parts 是否存在
+                if not hasattr(response, 'parts') or not response.parts:
+                    debug_log.append("NoPartsInResponse")
+                else:
                     for i, part in enumerate(response.parts):
                         ptype = "unknown"
                         if hasattr(part, "text"): ptype = f"text({len(part.text)})"
-                        if hasattr(part, "inline_data"): 
+                        if hasattr(part, "inline_data") and part.inline_data: 
                             ptype = "image"
                             result_image = f"data:image/png;base64,{part.inline_data.data}"
                             break
@@ -129,18 +137,22 @@ class handler(BaseHTTPRequestHandler):
                     f_reason = "Unknown"
                     try: f_reason = str(response.candidates[0].finish_reason)
                     except: pass
-                    safety = "None"
-                    try: safety = str(response.prompt_feedback.block_reason)
+                    
+                    safety_info = []
+                    try:
+                        for rating in response.candidates[0].safety_ratings:
+                            if rating.probability != "NEGLIGIBLE":
+                                safety_info.append(f"{rating.category}:{rating.probability}")
                     except: pass
                     
                     self._send_json({
                         "success": False, 
-                        "message": f"[{v_time}] AI 未能生成图像 | 原因: {f_reason} | 安全: {safety}",
+                        "message": f"[{v_time}] AI 未能生成图像 | 原因: {f_reason} | 风险: {','.join(safety_info) if safety_info else 'None'}",
                         "debug": " | ".join(debug_log)
                     }, 500)
                     return
             except Exception as pe:
-                self._send_json({"success": False, "message": f"[{v_time}] 结果解析异常: {str(pe)}"}, 500)
+                self._send_json({"success": False, "message": f"[{v_time}] 解析崩溃: {str(pe)}"}, 500)
                 return
 
             self._send_json({
