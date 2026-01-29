@@ -67,14 +67,24 @@ async function request<T>(
     });
 
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: '请求失败' }));
+        let errorData;
+        try {
+            errorData = await response.json();
+        } catch (e) {
+            errorData = { detail: '请求失败', status: response.status };
+        }
+
+        console.error(`API Error [${endpoint}]:`, {
+            status: response.status,
+            statusText: response.statusText,
+            data: errorData
+        });
 
         let message = '';
-        if (Array.isArray(error.detail)) {
-            // FastAPI 验证错误通常返回一个包含 loc, msg, type 的对象列表
-            message = error.detail.map((d: any) => d.msg || JSON.stringify(d)).join('; ');
+        if (errorData.detail && Array.isArray(errorData.detail)) {
+            message = errorData.detail.map((d: any) => d.msg || JSON.stringify(d)).join('; ');
         } else {
-            message = error.detail || `HTTP ${response.status}`;
+            message = errorData.detail || errorData.message || `HTTP ${response.status}`;
         }
 
         throw new Error(message);
