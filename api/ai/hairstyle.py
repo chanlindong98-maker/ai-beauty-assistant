@@ -40,10 +40,14 @@ def consume_credit(user_id: str, current_credits: int) -> bool:
 
 
 def extract_image(response) -> str:
-    for part in response.parts:
-        if hasattr(part, "inline_data") and part.inline_data:
-            return part.inline_data.data
+    try:
+        for part in response.parts:
+            if hasattr(part, "inline_data") and part.inline_data:
+                return part.inline_data.data
+    except Exception as e:
+        print(f"[AI] Extract Image Error: {str(e)}")
     return ""
+local_log = ""
 
 
 class handler(BaseHTTPRequestHandler):
@@ -128,13 +132,25 @@ class handler(BaseHTTPRequestHandler):
             
             cat_image = extract_image(cat_response)
 
+            if not rec_image or not cat_image:
+                f_reason = "Unknown"
+                try: f_reason = str(rec_response.candidates[0].finish_reason)
+                except: pass
+                self._send_json({
+                    "success": False, 
+                    "message": f"AI 未能生成发型图像 (原因: {f_reason})",
+                    "debug": "Image Extraction Failed"
+                }, 500)
+                return
+
             self._send_json({
                 "success": True,
                 "message": "推荐完成",
                 "analysis": analysis_text,
-                "recommended_image": f"data:image/png;base64,{rec_image}" if rec_image else None,
-                "catalog_image": f"data:image/png;base64,{cat_image}" if cat_image else None
+                "recommended_image": f"data:image/png;base64,{rec_image}",
+                "catalog_image": f"data:image/png;base64,{cat_image}"
             })
+            print("[Hairstyle] Success")
 
         except Exception as e:
             msg = str(e)
