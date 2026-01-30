@@ -14,10 +14,8 @@ const {
     consumeCredit
 } = require('./utils');
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-
 /**
- * 从 Gemini 响应中提取图像数据
+ * 从 API 响应中提取图像数据
  */
 function extractImage(result) {
     try {
@@ -28,10 +26,25 @@ function extractImage(result) {
                 }
             }
         }
-    } catch (e) {
-        console.error('[AI] Extract Image Error:', e);
-    }
+    } catch (e) { }
     return '';
+}
+
+/**
+ * 发送请求到 Gemini REST API
+ */
+async function callGemini(apiKey, payload) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok) {
+        throw new Error(result.error?.message || response.statusText);
+    }
+    return result;
 }
 
 exports.handler = async (event, context) => {
@@ -72,101 +85,55 @@ exports.handler = async (event, context) => {
             return jsonResponse({ success: false, message: '未配置 Gemini API 密钥，请在管理后台设置' }, 500);
         }
 
-        const genAI = new GoogleGenerativeAI(apiKey);
+        const genderTerm = gender === '男' ? '男士' : '女士';
+        const styleGuide = gender === '男' ? '如：寸头、背头、纹理烫等' : '如：法式慵懒卷、波波头、大波浪等';
 
-        // 文本分析模型
-        const textModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
-
-        const isMale = gender === '男';
-        const genderTerm = isMale ? '男士' : '女士';
-        const maleStyles = '如：寸头、背头、纹理烫等';
-        const femaleStyles = '如：法式慵懒卷、波波头、大波浪等';
-        const styleGuide = isMale ? maleStyles : femaleStyles;
-
-        const imagePart = {
-            inlineData: {
-                data: imageData,
-                mimeType: 'image/jpeg',
-            },
-        };
-
-        // 分析脸型
-        const analysisPrompt = `你是一位顶级发型设计师。请根据这张照片分析其脸型，并为这位【${age}岁】的【${genderTerm}】推荐10种发型。
-        发型款式应涵盖显著差异，${styleGuide}。
-        请按以下格式回复：
-        1. 脸型分析
-        2. 10种推荐发型列表
-        3. 最优发型推荐及理由`;
-
+        // 1. 分析脸型 (文本)
         console.log('[Hairstyle] Analyzing face...');
-        const analysisResponse = await textModel.generateContent([imagePart, analysisPrompt]);
+        const analysisResult = await callGemini(apiKey, {
+            contents: [{
+                parts: [
+                    { inline_data: { mime_type: 'image/jpeg', data: imageData } },
+                    { text: `你是一位顶级发型设计师。请根据这张照片分析其脸型，并为这位【${age}岁】的【${genderTerm}】推荐10种发型。发型款式应涵盖显著差异，${styleGuide}。请按以下格式回复：1. 脸型分析 2. 10种推荐发型列表 3. 最优发型推荐及理由` }
+                ]
+            }]
+        });
 
-        let analysisText = '';
-        if (analysisResponse.response.candidates?.[0]?.content?.parts) {
-            for (const part of analysisResponse.response.candidates[0].content.parts) {
-                if (part.text) {
-                    analysisText = part.text;
-                    break;
-                }
-            }
-        }
-        analysisText = analysisText || '未能生成分析';
+        const analysisText = analysisResult.candidates?.[0]?.content?.parts?.[0]?.text || '未能生成分析';
 
-        const imageModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
-        // 生成推荐发型图片
-        const recPrompt = `生成一张高度写实的正面照片。
-        必须使用原图中的人物面部，为这位${age}岁的人物换上一款完美的${genderTerm}发型。
-        背景简洁专业。`;
-
+        // 2. 生成推荐发型图片 (图像)
         console.log('[Hairstyle] Generating recommended hairstyle...');
-        const recResponseData = await imageModel.generateContent({
-            contents: [{ role: 'user', parts: [imagePart, { text: recPrompt }] }],
-            generationConfig: {
-                responseModalities: ['IMAGE'],
-            }
+        const recResult = await callGemini(apiKey, {
+            contents: [{
+                parts: [
+                    { inline_data: { mime_type: 'image/jpeg', data: imageData } },
+                    { text: `生成一张高度写实的正面照片。必须使用原图中的人物面部，为这位${age}岁的人物换上一款完美的${genderTerm}发型。背景简洁专业。` }
+                ]
+            }],
+            generationConfig: { response_modalities: ["IMAGE"] }
         });
-        const recResponse = recResponseData.response;
-        const recImage = extractImage(recResponse);
+        const recImage = extractImage(recResult);
 
-        // 生成发型目录
-        const catPrompt = `生成一张${age}岁${genderTerm}的发型参考画报。
-        展示10种风格迥异的发型，整齐网格排版。`;
-
+        // 3. 生成发型目录 (图像)
         console.log('[Hairstyle] Generating catalog...');
-        const catResponseData = await imageModel.generateContent({
-            contents: [{ role: 'user', parts: [imagePart, { text: catPrompt }] }],
-            generationConfig: {
-                responseModalities: ['IMAGE'],
-            }
+        const catResult = await callGemini(apiKey, {
+            contents: [{
+                parts: [
+                    { inline_data: { mime_type: 'image/jpeg', data: imageData } },
+                    { text: `生成一张${age}岁${genderTerm}的发型参考画报。展示10种风格迥异的发型，整齐网格排版。` }
+                ]
+            }],
+            generationConfig: { response_modalities: ["IMAGE"] }
         });
-        const catImage = extractImage(catResponseData.response);
-
-        const vTag = '[20260130-Netlify]';
+        const catImage = extractImage(catResult);
 
         if (!recImage || !catImage) {
-            let fReason = 'Unknown';
-            try {
-                fReason = String(recResponse.response.candidates?.[0]?.finishReason || 'Unknown');
-            } catch (e) { }
-
-            let safetyMsg = 'None';
-            try {
-                const risks = (recResponse.response.candidates?.[0]?.safetyRatings || [])
-                    .filter(r => r.probability !== 'NEGLIGIBLE')
-                    .map(r => `${r.category}:${r.probability}`);
-                if (risks.length) safetyMsg = risks.join(',');
-            } catch (e) { }
-
             return jsonResponse({
                 success: false,
-                message: `${vTag} AI 未能生成发型图像 | 原因: ${fReason} | 风险: ${safetyMsg}`,
-                debug: 'Extraction Failed',
+                message: `AI 未能完全生成发型图像`,
+                debug: 'Missing image output'
             }, 500);
         }
-
-        console.log('[Hairstyle] Success');
 
         return jsonResponse({
             success: true,
@@ -177,7 +144,6 @@ exports.handler = async (event, context) => {
         });
 
     } catch (e) {
-        const msg = e.message || String(e);
-        return jsonResponse({ success: false, message: `推荐失败: ${msg}` }, 500);
+        return jsonResponse({ success: false, message: `推荐失败: ${e.message}` }, 500);
     }
 };

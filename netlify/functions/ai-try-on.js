@@ -14,8 +14,6 @@ const {
     consumeCredit
 } = require('./utils');
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-
 exports.handler = async (event, context) => {
     // 处理 CORS 预检请求
     if (event.httpMethod === 'OPTIONS') {
@@ -58,9 +56,6 @@ exports.handler = async (event, context) => {
             return jsonResponse({ success: false, message: '未配置 Gemini API 密钥，请在管理后台设置' }, 500);
         }
 
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
         // 构建提示词
         let prompt;
         if (tryOnType === 'clothing') {
@@ -77,35 +72,45 @@ exports.handler = async (event, context) => {
             输出必须是戴上耳饰后的效果图。`;
         }
 
-        // 构建图片内容
-        const facePart = {
-            inlineData: {
-                data: faceData,
-                mimeType: 'image/jpeg',
-            },
-        };
-        const itemPart = {
-            inlineData: {
-                data: itemData,
-                mimeType: 'image/jpeg',
-            },
-        };
+        console.log('[Try-On] Calling Gemini REST API (v1beta)...');
 
-        console.log('[Try-On] Calling Gemini API (v2 stable)...');
+        // 直接使用 REST API 绕过 SDK 限制
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-        const responseData = await model.generateContent({
-            contents: [{ role: 'user', parts: [facePart, itemPart, { text: prompt }] }],
-            generationConfig: {
-                responseModalities: ['IMAGE'],
-            }
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [
+                    {
+                        parts: [
+                            { inline_data: { mime_type: 'image/jpeg', data: faceData } },
+                            { inline_data: { mime_type: 'image/jpeg', data: itemData } },
+                            { text: prompt }
+                        ]
+                    }
+                ],
+                generationConfig: {
+                    response_modalities: ["IMAGE"]
+                }
+            })
         });
-        const result = responseData.response;
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            console.error('[Try-On] REST API Error:', result);
+            return jsonResponse({
+                success: false,
+                message: `AI 调用失败: ${result.error?.message || response.statusText}`,
+                detail: result
+            }, response.status);
+        }
 
         // 提取图片
         let resultImage = null;
         let modelText = '';
         const debugLog = [];
-        const vTime = '20260130-Netlify';
 
         if (result.candidates && result.candidates[0]?.content?.parts) {
             for (let i = 0; i < result.candidates[0].content.parts.length; i++) {
@@ -121,35 +126,15 @@ exports.handler = async (event, context) => {
                     break;
                 }
             }
-        } else {
-            debugLog.push('EmptyParts');
         }
 
         if (!resultImage) {
-            let fReason = 'Unknown';
-            try {
-                fReason = String(result.candidates?.[0]?.finishReason || 'Unknown');
-            } catch (e) { }
-
-            const safetyInfo = [];
-            try {
-                const ratings = result.candidates?.[0]?.safetyRatings || [];
-                for (const rating of ratings) {
-                    if (rating.probability !== 'NEGLIGIBLE') {
-                        safetyInfo.push(`${rating.category}:${rating.probability}`);
-                    }
-                }
-            } catch (e) { }
-
-            let errMsg = `[${vTime}] AI 未能生成图像 | 原因: ${fReason} | 风险: ${safetyInfo.join(',') || 'None'}`;
-            if (modelText) {
-                errMsg += ` | AI解释: ${modelText.substring(0, 50)}`;
-            }
-
+            const fReason = result.candidates?.[0]?.finishReason || 'Unknown';
             return jsonResponse({
                 success: false,
-                message: errMsg,
-                debug: debugLog.join('/'),
+                message: `AI 未能生成图像 | 原因: ${fReason}`,
+                debug: debugLog.join('/') || 'Empty',
+                detail: result.candidates?.[0]
             }, 500);
         }
 
@@ -160,7 +145,6 @@ exports.handler = async (event, context) => {
         });
 
     } catch (e) {
-        const msg = e.message || String(e);
-        return jsonResponse({ success: false, message: `生成失败: ${msg}` }, 500);
+        return jsonResponse({ success: false, message: `生成失败: ${e.message}` }, 500);
     }
 };
