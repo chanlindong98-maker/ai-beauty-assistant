@@ -14,8 +14,6 @@ const {
     consumeCredit
 } = require('./utils');
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-
 exports.handler = async (event, context) => {
     // 处理 CORS 预检请求
     if (event.httpMethod === 'OPTIONS') {
@@ -53,9 +51,6 @@ exports.handler = async (event, context) => {
             return jsonResponse({ success: false, message: '未配置 Gemini API 密钥，请在管理后台设置' }, 500);
         }
 
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
         // 构建提示词
         let systemInstruction = '你是一位拥有深厚底蕴的中医及传统文化学者。';
         let prompt;
@@ -87,31 +82,40 @@ exports.handler = async (event, context) => {
             请用中文分段回复，需说明仅供参考。`;
         }
 
-        const imagePart = {
-            inlineData: {
-                data: imageData,
-                mimeType: 'image/jpeg',
-            },
-        };
-
         const fullPrompt = `${systemInstruction}\n\n${prompt}`;
 
-        console.log('[Analyze] Calling Gemini API...');
+        console.log('[Analyze] Calling Gemini REST API...');
 
-        const response = await model.generateContent([imagePart, fullPrompt]);
-        const result = response.response;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-        let resultText = '';
-        if (result.candidates && result.candidates[0]?.content?.parts) {
-            for (const part of result.candidates[0].content.parts) {
-                if (part.text) {
-                    resultText = part.text;
-                    break;
-                }
-            }
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [
+                    {
+                        parts: [
+                            { inline_data: { mime_type: 'image/jpeg', data: imageData } },
+                            { text: fullPrompt }
+                        ]
+                    }
+                ]
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            console.error('[Analyze] REST API Error:', result);
+            const errorMsg = result.error?.message || response.statusText;
+            return jsonResponse({
+                success: false,
+                message: `AI 调用失败: ${typeof errorMsg === 'object' ? JSON.stringify(errorMsg) : errorMsg}`,
+                detail: JSON.stringify(result)
+            }, response.status);
         }
 
-        resultText = resultText || 'AI 暂时无法给出分析结果';
+        let resultText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'AI 暂时无法给出分析结果';
 
         return jsonResponse({
             success: true,
@@ -120,7 +124,7 @@ exports.handler = async (event, context) => {
         });
 
     } catch (e) {
-        const msg = e.message || String(e);
-        return jsonResponse({ success: false, message: `分析失败: ${msg}` }, 500);
+        console.error('[Analyze] Fatal Error:', e);
+        return jsonResponse({ success: false, message: `分析过程异常: ${e.message || String(e)}` }, 500);
     }
 };

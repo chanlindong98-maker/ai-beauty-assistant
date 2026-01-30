@@ -100,10 +100,11 @@ exports.handler = async (event, context) => {
 
         if (!response.ok) {
             console.error('[Try-On] REST API Error:', result);
+            const errorMsg = result.error?.message || response.statusText;
             return jsonResponse({
                 success: false,
-                message: `AI 调用失败: ${result.error?.message || response.statusText}`,
-                detail: result
+                message: `AI 调用失败: ${typeof errorMsg === 'object' ? JSON.stringify(errorMsg) : errorMsg}`,
+                detail: JSON.stringify(result)
             }, response.status);
         }
 
@@ -145,6 +146,7 @@ exports.handler = async (event, context) => {
         });
 
     } catch (e) {
-        return jsonResponse({ success: false, message: `生成失败: ${e.message}` }, 500);
+        console.error('[Try-On] Fatal Error:', e);
+        return jsonResponse({ success: false, message: `生成发生异常: ${e.message || String(e)}` }, 500);
     }
 };

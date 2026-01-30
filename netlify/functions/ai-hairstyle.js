@@ -130,8 +130,8 @@ exports.handler = async (event, context) => {
         if (!recImage || !catImage) {
             return jsonResponse({
                 success: false,
-                message: `AI 未能完全生成发型图像`,
-                debug: 'Missing image output'
+                message: `AI 未能完全生成发型图像 (可能是安全过滤或资源受限)`,
+                detail: 'Missing image output'
             }, 500);
         }
 
@@ -144,6 +144,7 @@ exports.handler = async (event, context) => {
         });
 
     } catch (e) {
-        return jsonResponse({ success: false, message: `推荐失败: ${e.message}` }, 500);
+        console.error('[Hairstyle] Fatal Error:', e);
+        return jsonResponse({ success: false, message: `推荐过程异常: ${e.message || String(e)}` }, 500);
     }
 };
