@@ -77,13 +77,6 @@ exports.handler = async (event, context) => {
         // 文本分析模型
         const textModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-        // 图像生成模型
-        const imageModel = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash',
-            generationConfig: {
-                responseModalities: ['IMAGE'],
-            }
-        });
 
         const isMale = gender === '男';
         const genderTerm = isMale ? '男士' : '女士';
@@ -120,22 +113,35 @@ exports.handler = async (event, context) => {
         }
         analysisText = analysisText || '未能生成分析';
 
+        const imageModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
         // 生成推荐发型图片
         const recPrompt = `生成一张高度写实的正面照片。
         必须使用原图中的人物面部，为这位${age}岁的人物换上一款完美的${genderTerm}发型。
         背景简洁专业。`;
 
         console.log('[Hairstyle] Generating recommended hairstyle...');
-        const recResponse = await imageModel.generateContent([imagePart, recPrompt]);
-        const recImage = extractImage(recResponse.response);
+        const recResponseData = await imageModel.generateContent({
+            contents: [{ role: 'user', parts: [imagePart, { text: recPrompt }] }],
+            generationConfig: {
+                responseModalities: ['IMAGE'],
+            }
+        });
+        const recResponse = recResponseData.response;
+        const recImage = extractImage(recResponse);
 
         // 生成发型目录
         const catPrompt = `生成一张${age}岁${genderTerm}的发型参考画报。
         展示10种风格迥异的发型，整齐网格排版。`;
 
         console.log('[Hairstyle] Generating catalog...');
-        const catResponse = await imageModel.generateContent([imagePart, catPrompt]);
-        const catImage = extractImage(catResponse.response);
+        const catResponseData = await imageModel.generateContent({
+            contents: [{ role: 'user', parts: [imagePart, { text: catPrompt }] }],
+            generationConfig: {
+                responseModalities: ['IMAGE'],
+            }
+        });
+        const catImage = extractImage(catResponseData.response);
 
         const vTag = '[20260130-Netlify]';
 

@@ -59,12 +59,7 @@ exports.handler = async (event, context) => {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash',
-            generationConfig: {
-                responseModalities: ['IMAGE'],
-            }
-        });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
         // 构建提示词
         let prompt;
@@ -96,10 +91,15 @@ exports.handler = async (event, context) => {
             },
         };
 
-        console.log('[Try-On] Calling Gemini API...');
+        console.log('[Try-On] Calling Gemini API (v2 stable)...');
 
-        const response = await model.generateContent([facePart, itemPart, prompt]);
-        const result = response.response;
+        const responseData = await model.generateContent({
+            contents: [{ role: 'user', parts: [facePart, itemPart, { text: prompt }] }],
+            generationConfig: {
+                responseModalities: ['IMAGE'],
+            }
+        });
+        const result = responseData.response;
 
         // 提取图片
         let resultImage = null;
