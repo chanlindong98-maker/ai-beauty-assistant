@@ -81,7 +81,7 @@ exports.handler = async (event, context) => {
         const imageModel = genAI.getGenerativeModel({
             model: 'gemini-2.0-flash',
             generationConfig: {
-                responseModalities: ['image', 'text'],
+                responseModalities: ['IMAGE'],
             }
         });
 
