@@ -9,6 +9,7 @@ lerna-debug.log*
 
 # Dependencies
 node_modules
+netlify/functions/node_modules
 
 # Build outputs
 dist

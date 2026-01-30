@@ -1,0 +1,87 @@
+# Netlify 配置文件
+
+[build]
+  # 前端构建命令
+  command = "npm run build"
+  # 构建输出目录（Vite 默认输出到 dist）
+  publish = "dist"
+  # Netlify Functions 目录
+  functions = "netlify/functions"
+
+[functions]
+  # Python 运行时版本
+  node_bundler = "esbuild"
+  # 启用不捆绑外部模块
+  external_node_modules = ["*"]
+
+# 所有 API 路由重定向到 Functions
+[[redirects]]
+  from = "/api/auth/login"
+  to = "/.netlify/functions/auth-login"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/register"
+  to = "/.netlify/functions/auth-register"
+  status = 200
+
+[[redirects]]
+  from = "/api/user/profile"
+  to = "/.netlify/functions/user-profile"
+  status = 200
+
+[[redirects]]
+  from = "/api/user/redeem"
+  to = "/.netlify/functions/user-redeem"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai/try-on"
+  to = "/.netlify/functions/ai-try-on"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai/analyze"
+  to = "/.netlify/functions/ai-analyze"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai/hairstyle"
+  to = "/.netlify/functions/ai-hairstyle"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin_stats"
+  to = "/.netlify/functions/admin?action=stats"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin_users"
+  to = "/.netlify/functions/admin?action=users"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin_credits"
+  to = "/.netlify/functions/admin?action=credits"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin_config"
+  to = "/.netlify/functions/admin?action=config"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin_reset_password"
+  to = "/.netlify/functions/admin?action=password"
+  status = 200
+
+[[redirects]]
+  from = "/api/ping"
+  to = "/.netlify/functions/ping"
+  status = 200
+
+# SPA 回退（所有未匹配的路由指向 index.html）
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
