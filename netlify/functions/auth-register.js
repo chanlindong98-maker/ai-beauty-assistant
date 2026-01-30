@@ -27,14 +27,21 @@ exports.handler = async (event, context) => {
         const supabase = getSupabaseClient();
         const email = `${username}@happy-beauty.local`;
 
-        // 创建用户
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+        // 使用 Admin API 直接创建用户，避免邮件验证问题
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
             email,
             password,
+            email_confirm: true, // 直接标记为已验证
+            user_metadata: { nickname }
         });
 
         if (authError || !authData.user) {
-            return jsonResponse({ success: false, message: '哎呀，注册通道拥挤，请稍后再试' }, 400);
+            console.error('Supabase Auth registry error:', authError);
+            return jsonResponse({
+                success: false,
+                message: '注册失败了，请看详细错误提示 🍬',
+                detail: authError?.message || '未知认证错误'
+            }, 400);
         }
 
         const userId = authData.user.id;
