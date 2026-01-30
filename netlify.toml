@@ -9,10 +9,8 @@
   functions = "netlify/functions"
 
 [functions]
-  # Python 运行时版本
+  # 使用 esbuild 进行打包，它会自动处理本地文件的 require
   node_bundler = "esbuild"
-  # 启用不捆绑外部模块
-  external_node_modules = ["*"]
 
 # 所有 API 路由重定向到 Functions
 [[redirects]]
