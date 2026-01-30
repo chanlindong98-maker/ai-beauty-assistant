@@ -91,7 +91,7 @@ exports.handler = async (event, context) => {
                     }
                 ],
                 generationConfig: {
-                    response_modalities: ["IMAGE"]
+                    responseModalities: ["IMAGE"]
                 }
             })
         });

@@ -110,7 +110,7 @@ exports.handler = async (event, context) => {
                     { text: `生成一张高度写实的正面照片。必须使用原图中的人物面部，为这位${age}岁的人物换上一款完美的${genderTerm}发型。背景简洁专业。` }
                 ]
             }],
-            generationConfig: { response_modalities: ["IMAGE"] }
+            generationConfig: { responseModalities: ["IMAGE"] }
         });
         const recImage = extractImage(recResult);
 
@@ -123,7 +123,7 @@ exports.handler = async (event, context) => {
                     { text: `生成一张${age}岁${genderTerm}的发型参考画报。展示10种风格迥异的发型，整齐网格排版。` }
                 ]
             }],
-            generationConfig: { response_modalities: ["IMAGE"] }
+            generationConfig: { responseModalities: ["IMAGE"] }
         });
         const catImage = extractImage(catResult);
 
