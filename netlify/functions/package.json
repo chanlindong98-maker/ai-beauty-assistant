@@ -1,0 +1,7 @@
+{
+    "name": "ai-beauty-functions",
+    "version": "1.0.0",
+    "private": true,
+    "type": "commonjs",
+    "description": "强制指定此目录下的 .js 文件使用 CommonJS 格式"
+}
